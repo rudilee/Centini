@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT          +=  core network
+QT          +=  core network sql
 
 QT          -=  gui
 
@@ -16,7 +16,11 @@ TEMPLATE    =   app
 
 SOURCES     +=  main.cpp \
                 asteriskmanager.cpp \
-    centiniserver.cpp
+				centiniserver.cpp \
+				desktopuser.cpp \
+				user.cpp
 
 HEADERS     +=  asteriskmanager.h \
-    centiniserver.h
+				centiniserver.h \
+				desktopuser.h \
+				user.h

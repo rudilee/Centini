@@ -1,624 +1,762 @@
-#include <QDateTime>
+#include <QUuid>
 
 #include "asteriskmanager.h"
 
 AsteriskManager::AsteriskManager(QObject *parent) :
-    QTcpSocket(parent),
-    responseEnum(AsteriskManager::staticMetaObject.enumerator(AsteriskManager::staticMetaObject.indexOfEnumerator("Response"))),
-    eventEnum(AsteriskManager::staticMetaObject.enumerator(AsteriskManager::staticMetaObject.indexOfEnumerator("Event"))),
-    actionEnum(AsteriskManager::staticMetaObject.enumerator(AsteriskManager::staticMetaObject.indexOfEnumerator("Action")))
+	QTcpSocket(parent),
+	responseEnum(AsteriskManager::staticMetaObject.enumerator(AsteriskManager::staticMetaObject.indexOfEnumerator("Response"))),
+	eventEnum(AsteriskManager::staticMetaObject.enumerator(AsteriskManager::staticMetaObject.indexOfEnumerator("Event")))
 {
-    connect(this, SIGNAL(readyRead()), SLOT(onReadyRead()));
+	connect(this, SIGNAL(readyRead()), SLOT(onReadyRead()));
 }
 
-void AsteriskManager::actionAbsoluteTimeout()
+QString AsteriskManager::actionAbsoluteTimeout()
 {
+	return sendAction("AbsoluteTimeout");
 }
 
-void AsteriskManager::actionAgentLogoff()
+QString AsteriskManager::actionAgentLogoff()
 {
+	return sendAction("AgentLogoff");
 }
 
-void AsteriskManager::actionAgents()
+QString AsteriskManager::actionAgents()
 {
+	return sendAction("Agents");
 }
 
-void AsteriskManager::actionAGI()
+QString AsteriskManager::actionAGI()
 {
+	return sendAction("AGI");
 }
 
-void AsteriskManager::actionAOCMessage()
+QString AsteriskManager::actionAOCMessage()
 {
+	return sendAction("AOCMessage");
 }
 
-void AsteriskManager::actionAtxfer()
+QString AsteriskManager::actionAtxfer()
 {
+	return sendAction("Atxfer");
 }
 
-void AsteriskManager::actionBridge()
+QString AsteriskManager::actionBridge()
 {
+	return sendAction("Bridge");
 }
 
-void AsteriskManager::actionChallenge()
+QString AsteriskManager::actionChallenge()
 {
+	return sendAction("Challenge");
 }
 
-void AsteriskManager::actionChangeMonitor()
+QString AsteriskManager::actionChangeMonitor()
 {
+	return sendAction("ChangeMonitor");
 }
 
-void AsteriskManager::actionCommand()
+QString AsteriskManager::actionCommand()
 {
+	return sendAction("Command");
 }
 
-void AsteriskManager::actionConfbridgeKick()
+QString AsteriskManager::actionConfbridgeKick()
 {
+	return sendAction("ConfbridgeKick");
 }
 
-void AsteriskManager::actionConfbridgeList()
+QString AsteriskManager::actionConfbridgeList()
 {
+	return sendAction("ConfbridgeList");
 }
 
-void AsteriskManager::actionConfbridgeListRooms()
+QString AsteriskManager::actionConfbridgeListRooms()
 {
+	return sendAction("ConfbridgeListRooms");
 }
 
-void AsteriskManager::actionConfbridgeLock()
+QString AsteriskManager::actionConfbridgeLock()
 {
+	return sendAction("ConfbridgeLock");
 }
 
-void AsteriskManager::actionConfbridgeMute()
+QString AsteriskManager::actionConfbridgeMute()
 {
+	return sendAction("ConfbridgeMute");
 }
 
-void AsteriskManager::actionConfbridgeSetSingleVideoSrc()
+QString AsteriskManager::actionConfbridgeSetSingleVideoSrc()
 {
+	return sendAction("ConfbridgeSetSingleVideoSrc");
 }
 
-void AsteriskManager::actionConfbridgeStartRecord()
+QString AsteriskManager::actionConfbridgeStartRecord()
 {
+	return sendAction("ConfbridgeStartRecord");
 }
 
-void AsteriskManager::actionConfbridgeStopRecord()
+QString AsteriskManager::actionConfbridgeStopRecord()
 {
+	return sendAction("ConfbridgeStopRecord");
 }
 
-void AsteriskManager::actionConfbridgeUnlock()
+QString AsteriskManager::actionConfbridgeUnlock()
 {
+	return sendAction("ConfbridgeUnlock");
 }
 
-void AsteriskManager::actionConfbridgeUnmute()
+QString AsteriskManager::actionConfbridgeUnmute()
 {
+	return sendAction("ConfbridgeUnmute");
 }
 
-void AsteriskManager::actionCoreSettings()
+QString AsteriskManager::actionCoreSettings()
 {
+	return sendAction("CoreSettings");
 }
 
-void AsteriskManager::actionCoreShowChannels()
+QString AsteriskManager::actionCoreShowChannels()
 {
+	return sendAction("CoreShowChannels");
 }
 
-void AsteriskManager::actionCoreStatus()
+QString AsteriskManager::actionCoreStatus()
 {
+	return sendAction("CoreStatus");
 }
 
-void AsteriskManager::actionCreateConfig()
+QString AsteriskManager::actionCreateConfig()
 {
+	return sendAction("CreateConfig");
 }
 
-void AsteriskManager::actionDAHDIDialOffhook()
+QString AsteriskManager::actionDAHDIDialOffhook()
 {
+	return sendAction("DAHDIDialOffhook");
 }
 
-void AsteriskManager::actionDAHDIDNDoff()
+QString AsteriskManager::actionDAHDIDNDoff()
 {
+	return sendAction("DAHDIDNDoff");
 }
 
-void AsteriskManager::actionDAHDIDNDon()
+QString AsteriskManager::actionDAHDIDNDon()
 {
+	return sendAction("DAHDIDNDon");
 }
 
-void AsteriskManager::actionDAHDIHangup()
+QString AsteriskManager::actionDAHDIHangup()
 {
+	return sendAction("DAHDIHangup");
 }
 
-void AsteriskManager::actionDAHDIRestart()
+QString AsteriskManager::actionDAHDIRestart()
 {
+	return sendAction("DAHDIRestart");
 }
 
-void AsteriskManager::actionDAHDIShowChannels()
+QString AsteriskManager::actionDAHDIShowChannels()
 {
+	return sendAction("DAHDIShowChannels");
 }
 
-void AsteriskManager::actionDAHDITransfer()
+QString AsteriskManager::actionDAHDITransfer()
 {
+	return sendAction("DAHDITransfer");
 }
 
-void AsteriskManager::actionDataGet()
+QString AsteriskManager::actionDataGet()
 {
+	return sendAction("DataGet");
 }
 
-void AsteriskManager::actionDBDel()
+QString AsteriskManager::actionDBDel()
 {
+	return sendAction("DBDel");
 }
 
-void AsteriskManager::actionDBDelTree()
+QString AsteriskManager::actionDBDelTree()
 {
+	return sendAction("DBDelTree");
 }
 
-void AsteriskManager::actionDBGet()
+QString AsteriskManager::actionDBGet()
 {
+	return sendAction("DBGet");
 }
 
-void AsteriskManager::actionDBPut()
+QString AsteriskManager::actionDBPut()
 {
+	return sendAction("DBPut");
 }
 
-void AsteriskManager::actionEvents()
+QString AsteriskManager::actionEvents()
 {
+	return sendAction("Events");
 }
 
-void AsteriskManager::actionExtensionState()
+QString AsteriskManager::actionExtensionState()
 {
+	return sendAction("ExtensionState");
 }
 
-void AsteriskManager::actionFilter()
+QString AsteriskManager::actionFilter()
 {
+	return sendAction("Filter");
 }
 
-void AsteriskManager::actionFilterList()
+QString AsteriskManager::actionFilterList()
 {
+	return sendAction("FilterList");
 }
 
-void AsteriskManager::actionGetConfig()
+QString AsteriskManager::actionGetConfig()
 {
+	return sendAction("GetConfig");
 }
 
-void AsteriskManager::actionGetConfigJSON()
+QString AsteriskManager::actionGetConfigJSON()
 {
+	return sendAction("GetConfigJSON");
 }
 
-void AsteriskManager::actionGetvar()
+QString AsteriskManager::actionGetvar()
 {
+	return sendAction("Getvar");
 }
 
-void AsteriskManager::actionHangup(QString channel, uint cause, QString actionID)
+QString AsteriskManager::actionHangup(QString channel, uint cause)
 {
-    QVariantMap headers;
-    headers["ActionID"] = actionID;
-    headers["Channel"] = channel;
+	QVariantMap headers;
+	headers["Channel"] = channel;
 
-    insertNotEmpty(&headers, "Cause", cause);
+	insertNotEmpty(&headers, "Cause", cause);
 
-    sendAction(Action::Login, headers);
+	return sendAction("Hangup", headers);
 }
 
-void AsteriskManager::actionIAXnetstats()
+QString AsteriskManager::actionIAXnetstats()
 {
+	return sendAction("IAXnetstats");
 }
 
-void AsteriskManager::actionIAXpeerlist()
+QString AsteriskManager::actionIAXpeerlist()
 {
+	return sendAction("IAXpeerlist");
 }
 
-void AsteriskManager::actionIAXpeers()
+QString AsteriskManager::actionIAXpeers()
 {
+	return sendAction("IAXpeers");
 }
 
-void AsteriskManager::actionIAXregistry()
+QString AsteriskManager::actionIAXregistry()
 {
+	return sendAction("IAXregistry");
 }
 
-void AsteriskManager::actionJabberSend()
+QString AsteriskManager::actionJabberSend()
 {
+	return sendAction("JabberSend");
 }
 
-void AsteriskManager::actionJabberSend_res_jabber()
+QString AsteriskManager::actionJabberSendResJabber()
 {
+	return sendAction("JabberSend_res_jabber");
 }
 
-void AsteriskManager::actionJabberSend_res_xmpp()
+QString AsteriskManager::actionJabberSendResXmpp()
 {
+	return sendAction("JabberSend_res_xmpp");
 }
 
-void AsteriskManager::actionListCategories()
+QString AsteriskManager::actionListCategories()
 {
+	return sendAction("ListCategories");
 }
 
-void AsteriskManager::actionListCommands()
+QString AsteriskManager::actionListCommands()
 {
+	return sendAction("ListCommands");
 }
 
-void AsteriskManager::actionLocalOptimizeAway()
+QString AsteriskManager::actionLocalOptimizeAway()
 {
+	return sendAction("LocalOptimizeAway");
 }
 
-void AsteriskManager::actionLogin(QString username, QString secret, QString actionID)
+QString AsteriskManager::actionLogin(QString username, QString secret)
 {
-    QVariantMap headers;
-    headers["ActionID"] = actionID;
-    headers["Username"] = username;
+	QVariantMap headers;
+	headers["Username"] = username;
 
-    insertNotEmpty(&headers, "Secret", secret);
+	insertNotEmpty(&headers, "Secret", secret);
 
-    sendAction(Action::Login, headers);
+	return sendAction("Login", headers);
 }
 
-void AsteriskManager::actionLogoff(QString actionID)
+QString AsteriskManager::actionLogoff()
 {
-    QVariantMap headers;
-    headers["ActionID"] = actionID;
-
-    sendAction(Action::Logoff, headers);
+	return sendAction("Logoff");
 }
 
-void AsteriskManager::actionMailboxCount()
+QString AsteriskManager::actionMailboxCount()
 {
+	return sendAction("MailboxCount");
 }
 
-void AsteriskManager::actionMailboxStatus()
+QString AsteriskManager::actionMailboxStatus()
 {
+	return sendAction("MailboxStatus");
 }
 
-void AsteriskManager::actionMeetmeList()
+QString AsteriskManager::actionMeetmeList()
 {
+	return sendAction("MeetmeList");
 }
 
-void AsteriskManager::actionMeetmeListRooms()
+QString AsteriskManager::actionMeetmeListRooms()
 {
+	return sendAction("MeetmeListRooms");
 }
 
-void AsteriskManager::actionMeetmeMute()
+QString AsteriskManager::actionMeetmeMute()
 {
+	return sendAction("MeetmeMute");
 }
 
-void AsteriskManager::actionMeetmeUnmute()
+QString AsteriskManager::actionMeetmeUnmute()
 {
+	return sendAction("MeetmeUnmute");
 }
 
-void AsteriskManager::actionMessageSend()
+QString AsteriskManager::actionMessageSend()
 {
+	return sendAction("MessageSend");
 }
 
-void AsteriskManager::actionMixMonitor()
+QString AsteriskManager::actionMixMonitor()
 {
+	return sendAction("MixMonitor");
 }
 
-void AsteriskManager::actionMixMonitorMute()
+QString AsteriskManager::actionMixMonitorMute()
 {
+	return sendAction("MixMonitorMute");
 }
 
-void AsteriskManager::actionModuleCheck()
+QString AsteriskManager::actionModuleCheck()
 {
+	return sendAction("ModuleCheck");
 }
 
-void AsteriskManager::actionModuleLoad()
+QString AsteriskManager::actionModuleLoad()
 {
+	return sendAction("ModuleLoad");
 }
 
-void AsteriskManager::actionMonitor()
+QString AsteriskManager::actionMonitor()
 {
+	return sendAction("Monitor");
 }
 
-void AsteriskManager::actionMuteAudio()
+QString AsteriskManager::actionMuteAudio()
 {
+	return sendAction("MuteAudio");
 }
 
-void AsteriskManager::actionOriginate(QString channel,
-                                      QString exten,
-                                      QString context,
-                                      uint priority,
-                                      QString application,
-                                      QString data,
-                                      uint timeout,
-                                      QString callerID,
-                                      QVariantMap variables,
-                                      QString account,
-                                      bool earlyMedia,
-                                      bool async,
-                                      QStringList codecs, QString actionID)
+QString AsteriskManager::actionOriginate(QString channel,
+										 QString exten,
+										 QString context,
+										 uint priority,
+										 QString application,
+										 QString data,
+										 uint timeout,
+										 QString callerID,
+										 QVariantMap variables,
+										 QString account,
+										 boolean earlyMedia,
+										 boolean async,
+										 QStringList codecs)
 {
-    QVariantMap headers;
-    headers["ActionID"] = actionID;
-    headers["Channel"] = channel;
+	QVariantMap headers;
+	headers["Channel"] = channel;
 
-    insertNotEmpty(&headers, "Exten", exten);
-    insertNotEmpty(&headers, "Context", context);
-    insertNotEmpty(&headers, "Priority", priority);
-    insertNotEmpty(&headers, "Application", application);
-    insertNotEmpty(&headers, "Data", data);
-    insertNotEmpty(&headers, "Timeout", timeout);
-    insertNotEmpty(&headers, "CallerID", callerID);
-    insertNotEmpty(&headers, "Account", account);
-    insertNotEmpty(&headers, "EarlyMedia", earlyMedia);
-    insertNotEmpty(&headers, "Async", async);
-    insertNotEmpty(&headers, "Codecs", codecs.join(','));
+	insertNotEmpty(&headers, "Exten", exten);
+	insertNotEmpty(&headers, "Context", context);
+	insertNotEmpty(&headers, "Priority", priority);
+	insertNotEmpty(&headers, "Application", application);
+	insertNotEmpty(&headers, "Data", data);
+	insertNotEmpty(&headers, "Timeout", timeout);
+	insertNotEmpty(&headers, "CallerID", callerID);
+	insertNotEmpty(&headers, "Account", account);
+	insertNotEmpty(&headers, "EarlyMedia", earlyMedia);
+	insertNotEmpty(&headers, "Async", async);
+	insertNotEmpty(&headers, "Codecs", codecs.join(','));
 
-    if (!variables.isEmpty()) {
-        QMapIterator<QString, QVariant> variable(variables);
-        while (variable.hasNext()) {
-            variable.next();
+	if (!variables.isEmpty()) {
+		QMapIterator<QString, QVariant> variable(variables);
+		while (variable.hasNext()) {
+			variable.next();
 
-            headers.insertMulti("Variable", QString("%1=%2").arg(variable.key(), valueToString(variable.value())));
-        }
-    }
+			headers.insertMulti("Variable", QString("%1=%2").arg(variable.key(), valueToString(variable.value())));
+		}
+	}
 
-    sendAction(Action::Originate, headers);
+	return sendAction("Originate", headers);
 }
 
-void AsteriskManager::actionPark()
+QString AsteriskManager::actionPark()
 {
+	return sendAction("Park");
 }
 
-void AsteriskManager::actionParkedCalls()
+QString AsteriskManager::actionParkedCalls()
 {
+	return sendAction("ParkedCalls");
 }
 
-void AsteriskManager::actionParkinglots()
+QString AsteriskManager::actionParkinglots()
 {
+	return sendAction("Parkinglots");
 }
 
-void AsteriskManager::actionPauseMonitor()
+QString AsteriskManager::actionPauseMonitor()
 {
+	return sendAction("PauseMonitor");
 }
 
-void AsteriskManager::actionPing()
+QString AsteriskManager::actionPing()
 {
+	return sendAction("Ping");
 }
 
-void AsteriskManager::actionPlayDTMF()
+QString AsteriskManager::actionPlayDTMF()
 {
+	return sendAction("PlayDTMF");
 }
 
-void AsteriskManager::actionPresenceState()
+QString AsteriskManager::actionPresenceState()
 {
+	return sendAction("PresenceState");
 }
 
-void AsteriskManager::actionPRIShowSpans()
+QString AsteriskManager::actionPRIShowSpans()
 {
+	return sendAction("PRIShowSpans");
 }
 
-void AsteriskManager::actionQueueAdd()
+QString AsteriskManager::actionQueueAdd(QString queue,
+										QString interface,
+										uint penalty,
+										boolean paused,
+										QString memberName,
+										QString stateInterface)
 {
+	QVariantMap headers;
+	headers["Queue"] = queue;
+	headers["Interface"] = interface;
+
+	insertNotEmpty(&headers, "Penalty", penalty);
+	insertNotEmpty(&headers, "Paused", paused);
+	insertNotEmpty(&headers, "MemberName", memberName);
+	insertNotEmpty(&headers, "StateInterface", stateInterface);
+
+	return sendAction("QueueAdd", headers);
 }
 
-void AsteriskManager::actionQueueLog()
+QString AsteriskManager::actionQueueLog()
 {
+	return sendAction("QueueLog");
 }
 
-void AsteriskManager::actionQueueMemberRingInUse()
+QString AsteriskManager::actionQueueMemberRingInUse()
 {
+	return sendAction("QueueMemberRingInUse");
 }
 
-void AsteriskManager::actionQueuePause()
+QString AsteriskManager::actionQueuePause(QString interface, boolean paused, QString queue, QString reason)
 {
+	QVariantMap headers;
+	headers["Interface"] = interface;
+	headers["Paused"] = paused;
+
+	insertNotEmpty(&headers, "Queue", queue);
+	insertNotEmpty(&headers, "Reason", reason);
+
+	return sendAction("QueuePause", headers);
 }
 
-void AsteriskManager::actionQueuePenalty()
+QString AsteriskManager::actionQueuePenalty()
 {
+	return sendAction("QueuePenalty");
 }
 
-void AsteriskManager::actionQueueReload()
+QString AsteriskManager::actionQueueReload()
 {
+	return sendAction("QueueReload");
 }
 
-void AsteriskManager::actionQueueRemove()
+QString AsteriskManager::actionQueueRemove(QString queue, QString interface)
 {
+	QVariantMap headers;
+	headers["Queue"] = queue;
+	headers["Interface"] = interface;
+
+	return sendAction("QueueRemove");
 }
 
-void AsteriskManager::actionQueueReset()
+QString AsteriskManager::actionQueueReset()
 {
+	return sendAction("QueueReset");
 }
 
-void AsteriskManager::actionQueueRule()
+QString AsteriskManager::actionQueueRule()
 {
+	return sendAction("QueueRule");
 }
 
-void AsteriskManager::actionQueues()
+QString AsteriskManager::actionQueues()
 {
+	return sendAction("Queues");
 }
 
-void AsteriskManager::actionQueueStatus()
+QString AsteriskManager::actionQueueStatus(QString queue, QString member)
 {
+	QVariantMap headers;
+
+	insertNotEmpty(&headers, "Queue", queue);
+	insertNotEmpty(&headers, "Member", member);
+
+	return sendAction("QueueStatus", headers);
 }
 
-void AsteriskManager::actionQueueSummary()
+QString AsteriskManager::actionQueueSummary()
 {
+	return sendAction("QueueSummary");
 }
 
-void AsteriskManager::actionRedirect()
+QString AsteriskManager::actionRedirect()
 {
+	return sendAction("Redirect");
 }
 
-void AsteriskManager::actionReload()
+QString AsteriskManager::actionReload()
 {
+	return sendAction("Reload");
 }
 
-void AsteriskManager::actionSendText()
+QString AsteriskManager::actionSendText()
 {
+	return sendAction("SendText");
 }
 
-void AsteriskManager::actionSetvar()
+QString AsteriskManager::actionSetvar()
 {
+	return sendAction("Setvar");
 }
 
-void AsteriskManager::actionShowDialPlan()
+QString AsteriskManager::actionShowDialPlan()
 {
+	return sendAction("ShowDialPlan");
 }
 
-void AsteriskManager::actionSIPnotify()
+QString AsteriskManager::actionSIPnotify()
 {
+	return sendAction("SIPnotify");
 }
 
-void AsteriskManager::actionSIPpeers()
+QString AsteriskManager::actionSIPpeers()
 {
+	return sendAction("SIPpeers");
 }
 
-void AsteriskManager::actionSIPpeerstatus()
+QString AsteriskManager::actionSIPpeerstatus()
 {
+	return sendAction("SIPpeerstatus");
 }
 
-void AsteriskManager::actionSIPqualifypeer()
+QString AsteriskManager::actionSIPqualifypeer()
 {
+	return sendAction("SIPqualifypeer");
 }
 
-void AsteriskManager::actionSIPshowpeer()
+QString AsteriskManager::actionSIPshowpeer(QString peer)
 {
+	QVariantMap headers;
+	headers["Peer"] = peer;
+
+	return sendAction("SIPshowpeer", headers);
 }
 
-void AsteriskManager::actionSIPshowregistry()
+QString AsteriskManager::actionSIPshowregistry()
 {
+	return sendAction("SIPshowregistry");
 }
 
-void AsteriskManager::actionSKINNYdevices()
+QString AsteriskManager::actionSKINNYdevices()
 {
+	return sendAction("SKINNYdevices");
 }
 
-void AsteriskManager::actionSKINNYlines()
+QString AsteriskManager::actionSKINNYlines()
 {
+	return sendAction("SKINNYlines");
 }
 
-void AsteriskManager::actionSKINNYshowdevice()
+QString AsteriskManager::actionSKINNYshowdevice()
 {
+	return sendAction("SKINNYshowdevice");
 }
 
-void AsteriskManager::actionSKINNYshowline()
+QString AsteriskManager::actionSKINNYshowline()
 {
+	return sendAction("SKINNYshowline");
 }
 
-void AsteriskManager::actionStatus()
+QString AsteriskManager::actionStatus()
 {
+	return sendAction("Status");
 }
 
-void AsteriskManager::actionStopMixMonitor()
+QString AsteriskManager::actionStopMixMonitor()
 {
+	return sendAction("StopMixMonitor");
 }
 
-void AsteriskManager::actionStopMonitor()
+QString AsteriskManager::actionStopMonitor()
 {
+	return sendAction("StopMonitor");
 }
 
-void AsteriskManager::actionUnpauseMonitor()
+QString AsteriskManager::actionUnpauseMonitor()
 {
+	return sendAction("UnpauseMonitor");
 }
 
-void AsteriskManager::actionUpdateConfig()
+QString AsteriskManager::actionUpdateConfig()
 {
+	return sendAction("UpdateConfig");
 }
 
-void AsteriskManager::actionUserEvent()
+QString AsteriskManager::actionUserEvent()
 {
+	return sendAction("UserEvent");
 }
 
-void AsteriskManager::actionVoicemailUsersList()
+QString AsteriskManager::actionVoicemailUsersList()
 {
+	return sendAction("VoicemailUsersList");
 }
 
-void AsteriskManager::actionWaitEvent ()
+QString AsteriskManager::actionWaitEvent()
 {
+	return sendAction("WaitEvent");
 }
 
 QString AsteriskManager::valueToString(QVariant value)
 {
-    switch (value.type()) {
-    case QMetaType::Bool:
-        return value.toBool() ? "true" : "false";
-    default:
-        return value.toString();
-    }
+	switch (value.type()) {
+	case QMetaType::Char:
+		return value.toChar() == 1 ? "true" : "false";
+	default:
+		return value.toString();
+	}
 }
 
 QVariant AsteriskManager::stringValue(QString string)
 {
-    return QVariant(string);
-}
+	QVariant value(string);
 
-AsteriskManager::Action AsteriskManager::fetchAction(QString actionID)
-{
-    Action action;
+	if (string == "true" || string == "false")
+		value.setValue(string == "true");
+	else if (QVariant(value).convert(QMetaType::UInt))
+		value.setValue(string.toUInt());
 
-    if (actions.contains(actionID)) {
-        action = actions[actionID];
-
-        actions.remove(actionID);
-    }
-
-    return action;
+	return value;
 }
 
 void AsteriskManager::insertNotEmpty(QVariantMap *headers, QString key, QVariant value)
 {
-    bool isEmpty = false;
+	bool isEmpty = false;
 
-    switch (value.type()) {
-    case QMetaType::UInt:
-        isEmpty = value.toUInt() == 0;
-        break;
-    default:
-        isEmpty = value.isNull();
-        break;
-    }
+	switch (value.type()) {
+	case QMetaType::Char:
+		isEmpty = value.toChar() == -1;
+		break;
+	case QMetaType::UInt:
+		isEmpty = value.toUInt() == 0;
+		break;
+	default:
+		isEmpty = value.isNull();
+		break;
+	}
 
-    if (!isEmpty)
-        headers->insert(key, value);
+	if (!isEmpty)
+		headers->insert(key, value);
 }
 
 void AsteriskManager::dispatchPacket()
 {
-    if (packetBuffer.contains("Response")) {
-        Action action = fetchAction(packetBuffer["ActionID"].toString());
-        Response response = (Response) responseEnum.keyToValue(packetBuffer["Response"].toByteArray().data());
+	if (packetBuffer.contains("Response")) {
+		QString actionID = packetBuffer["ActionID"].toString();
+		Response response = (Response) responseEnum.keyToValue(packetBuffer["Response"].toByteArray().data());
 
-        emit responseSent(action, response, packetBuffer);
-    } else if (packetBuffer.contains("Event")) {
-        Event event = (Event) eventEnum.keyToValue(packetBuffer["Event"].toByteArray().data());
+		emit responseSent(response, packetBuffer, actionID);
+	} else if (packetBuffer.contains("Event")) {
+		Event event = (Event) eventEnum.keyToValue(packetBuffer["Event"].toByteArray().data());
 
-        emit eventGenerated(event, packetBuffer);
-    }
+		emit eventGenerated(event, packetBuffer);
+	}
 
-    packetBuffer.clear();
+	packetBuffer.clear();
 }
 
-void AsteriskManager::sendAction(AsteriskManager::Action action, QVariantMap headers)
+QString AsteriskManager::sendAction(QString action, QVariantMap headers)
 {
-    if (state() == QAbstractSocket::ConnectedState) {
-        QString actionID = headers["ActionID"].toString();
-        if (actionID.isEmpty() || actions.contains(actionID))
-            actionID = QString::number(QDateTime::currentDateTime().toMSecsSinceEpoch());
+	QString actionID = QString();
 
-        actions[actionID] = action;
+	if (state() == QAbstractSocket::ConnectedState) {
+		actionID = QUuid::createUuid().toString();
 
-        headers["ActionID"] = actionID;
-        headers["Action"] = actionEnum.valueToKey(action);
+		headers["ActionID"] = actionID;
+		headers["Action"] = action;
 
-        QMapIterator<QString, QVariant> header(headers);
-        while (header.hasNext()) {
-            header.next();
+		QMapIterator<QString, QVariant> header(headers);
+		while (header.hasNext()) {
+			header.next();
 
-            write(QString("%1: %2\r\n").arg(header.key(), valueToString(header.value())).toLatin1());
-        }
+			write(QString("%1: %2\r\n").arg(header.key(), valueToString(header.value())).toLatin1());
+		}
 
-        write("\r\n");
-    }
+		write("\r\n");
+	}
+
+	return actionID;
 }
 
 void AsteriskManager::onReadyRead()
 {
-    QRegExp keyValue("^([A-Za-z0-9\\-]+):\\s(.+)$");
-    QByteArray line;
+	QRegExp keyValue("^([A-Za-z0-9\\-]+):\\s(.+)$");
+	QByteArray line;
 
-    while (canReadLine()) {
-        line = readLine();qDebug() << line;
+//	qDebug("<ami>");
 
-        if (line != "\r\n") {
-            if (keyValue.indexIn(line) > -1)
-                packetBuffer[keyValue.cap(1)] = stringValue(keyValue.cap(2));
-            else if (line.startsWith("Asterisk Call Manager"))
-                emit connected(line.replace("Asterisk Call Manager/", QByteArray()));
-        } else if (!packetBuffer.isEmpty()) {
-            dispatchPacket();
-        }
-    }
+	while (canReadLine()) {
+		line = readLine();
+
+//		qDebug() << line.trimmed();
+
+		if (line != "\r\n") {
+			if (keyValue.indexIn(line) > -1)
+				packetBuffer[keyValue.cap(1)] = stringValue(keyValue.cap(2).trimmed());
+			else if (line.startsWith("Asterisk Call Manager"))
+				emit connected(line.replace("Asterisk Call Manager/", QByteArray()).trimmed());
+		} else if (!packetBuffer.isEmpty()) {
+			dispatchPacket();
+		}
+	}
+
+//	qDebug("</ami>");
 }
 
