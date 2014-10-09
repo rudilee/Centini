@@ -1,15 +1,19 @@
+#include <QCoreApplication>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QTimer>
 
 #include "centiniserver.h"
 #include "desktopuser.h"
+#include "webuser.h"
 
 CentiniServer::CentiniServer(QObject *parent) :
 	QObject(parent),
 	settings(new QSettings("/etc/centini.conf", QSettings::IniFormat)),
 	asterisk(new AsteriskManager(this)),
-	tcpServer(new QTcpServer(this))
+	tcpServer(new QTcpServer(this)),
+	webSocketServer(new QWebSocketServer(QString("%1 - %2").arg(QCoreApplication::applicationName(), QCoreApplication::applicationVersion()),
+										 QWebSocketServer::NonSecureMode))
 {
 	connect(asterisk, SIGNAL(connected(QString)), SLOT(onAsteriskConnected(QString)));
 	connect(asterisk, SIGNAL(disconnected()), SLOT(onAsteriskDisconnected()));
@@ -19,6 +23,7 @@ CentiniServer::CentiniServer(QObject *parent) :
 			SLOT(onAsteriskEventGenerated(AsteriskManager::Event,QVariantMap)));
 
 	connect(tcpServer, SIGNAL(newConnection()), SLOT(onTcpServerNewConnection()));
+	connect(webSocketServer, SIGNAL(newConnection()), SLOT(onWebSocketServerNewConnection()));
 }
 
 void CentiniServer::run()
@@ -27,6 +32,7 @@ void CentiniServer::run()
 	connectToAsterisk();
 
 	tcpServer->listen(QHostAddress::Any, settings->value("centini/port", 31415).toUInt());
+	webSocketServer->listen(QHostAddress::Any, settings->value("centini/ws_port", 8080).toUInt());
 
 	qDebug("Listening incoming connection");
 }
@@ -69,6 +75,8 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 				break;
 			}
 		}
+	} else {
+		qDebug() << "Login query failed, error:" << query.lastError().text();
 	}
 
 	response["success"] = success;
@@ -271,7 +279,27 @@ void CentiniServer::onTcpServerNewConnection()
 	user->setSocket(tcpServer->nextPendingConnection());
 	user->sendEvent(User::ActionReady, fields);
 
-	qDebug() << "New incoming connection from"
+	qDebug() << "New TCP Socket incoming connection from"
+			 << user->ipAddress();
+}
+
+void CentiniServer::onWebSocketServerNewConnection()
+{
+	QVariantMap fields;
+	fields["version"] = "0.0.1";
+
+	WebUser *user = new WebUser;
+
+	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
+	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
+	connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
+	connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
+	connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
+
+	user->setSocket(webSocketServer->nextPendingConnection());
+	user->sendEvent(User::ActionReady, fields);
+
+	qDebug() << "New WebSocket incoming connection from"
 			 << user->ipAddress();
 }
 

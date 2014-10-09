@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT          +=  core network sql
+QT          +=  core network sql websockets
 
 QT          -=  gui
 
@@ -18,9 +18,11 @@ SOURCES     +=  main.cpp \
                 asteriskmanager.cpp \
 				centiniserver.cpp \
 				desktopuser.cpp \
-				user.cpp
+				user.cpp \
+    webuser.cpp
 
 HEADERS     +=  asteriskmanager.h \
 				centiniserver.h \
 				desktopuser.h \
-				user.h
+				user.h \
+    webuser.h

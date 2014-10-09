@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QSqlDatabase>
 #include <QTcpServer>
+#include <QWebSocketServer>
 
 #include "asteriskmanager.h"
 #include "user.h"
@@ -23,6 +24,7 @@ private:
 	QSqlDatabase database;
 	AsteriskManager *asterisk;
 	QTcpServer *tcpServer;
+	QWebSocketServer *webSocketServer;
 	QHash<QString, User *> agents, supervisors, managers;
 	QString loginActionID;
 
@@ -51,6 +53,8 @@ private slots:
 	void onAsteriskEventGenerated(AsteriskManager::Event event, QVariantMap headers);
 
 	void onTcpServerNewConnection();
+	void onWebSocketServerNewConnection();
+
 	void onUserActionReceived(User::Action action, QVariantMap fields);
 	void onUserDisconnected();
 	void onUserQueueStateChanged(User::QueueState queueState);

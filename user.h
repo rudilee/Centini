@@ -59,7 +59,7 @@ public:
 		PhoneStateChanged
 	};
 
-	virtual void setUsername(QString username);
+	void setUsername(QString username);
 	QString username();
 
 	void setFullname(QString fullname);
@@ -90,6 +90,11 @@ public:
 
 	QString enumText(QString enumName, int index);
 	int enumIndex(QString enumName, QString text);
+
+protected:
+	int timerId;
+
+	void timerEvent(QTimerEvent *event);
 
 private:
 	QString username_, fullname_, peer_, queue_;

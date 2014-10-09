@@ -7,6 +7,7 @@ User::User(QObject *parent) :
 	QObject(parent),
 	client_(new QTcpSocket)
 {
+	timerId = startTimer(15000);
 }
 
 User::~User()
@@ -17,6 +18,9 @@ User::~User()
 void User::setUsername(QString username)
 {
 	username_ = username;
+
+	if (!username.isEmpty())
+		killTimer(timerId);
 }
 
 QString User::username()
@@ -141,4 +145,9 @@ int User::enumIndex(QString enumName, QString text)
 	const QMetaObject *object = metaObject();
 
 	return object->enumerator(object->indexOfEnumerator(enumName.toLatin1().data())).keysToValue(text.toLatin1().data());
+}
+
+void User::timerEvent(QTimerEvent *event)
+{
+	disconnect();
 }

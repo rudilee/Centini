@@ -7,15 +7,7 @@
 DesktopUser::DesktopUser(QObject *parent) :
 	User(parent)
 {
-	timerId = startTimer(15000);
-}
-
-void DesktopUser::setUsername(QString username)
-{
-	User::setUsername(username);
-
-	if (!username.isEmpty())
-		killTimer(timerId);
+	qDebug("Desktop User created");
 }
 
 void DesktopUser::setSocket(QTcpSocket *socket)
@@ -35,13 +27,10 @@ QString DesktopUser::ipAddress()
 
 void DesktopUser::disconnect()
 {
+	qDebug() << QString("TCP Socket on %1 disconnecting").arg(ipAddress());
+
 	socket_->flush();
 	socket_->disconnectFromHost();
-}
-
-void DesktopUser::timerEvent(QTimerEvent *event)
-{
-	disconnect();
 }
 
 void DesktopUser::parseMessageBuffer()
@@ -73,6 +62,7 @@ void DesktopUser::onSocketError(QAbstractSocket::SocketError socketError)
 
 void DesktopUser::onSocketReadyRead()
 {
+	// TODO: proses input yg lebih dari 1 baris, yg ini gak bener
 	while (socket_->canReadLine()) {
 		QByteArray line = socket_->readLine();
 

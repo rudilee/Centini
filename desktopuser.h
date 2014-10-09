@@ -20,11 +20,6 @@ public:
 
 	void disconnect();
 
-protected:
-	int timerId;
-
-	void timerEvent(QTimerEvent *event);
-
 private:
 	QTcpSocket *socket_;
 	QByteArray messageBuffer;
