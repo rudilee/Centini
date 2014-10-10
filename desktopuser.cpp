@@ -40,6 +40,8 @@ void DesktopUser::parseMessageBuffer()
 
 	if (!actionText.isEmpty())
 		emit actionReceived((User::Action) enumIndex("Action", actionText), fields);
+	else
+		socket_->write("Unrecognized command..\n");
 
 	messageBuffer.clear();
 }

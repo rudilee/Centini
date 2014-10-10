@@ -7,6 +7,7 @@
 #include <QTcpServer>
 #include <QWebSocketServer>
 
+#include "callbackquery.h"
 #include "asteriskmanager.h"
 #include "user.h"
 
@@ -20,6 +21,10 @@ public:
 	void run();
 
 private:
+	enum Query {
+		CheckUser
+	};
+
 	QSettings *settings;
 	QSqlDatabase database;
 	AsteriskManager *asterisk;
@@ -27,6 +32,8 @@ private:
 	QWebSocketServer *webSocketServer;
 	QHash<QString, User *> agents, supervisors, managers;
 	QString loginActionID;
+
+	void executeQuery(CallbackQuery *query);
 
 	void actionLogin(User *user, QString username, QString passwordHash);
 	void actionLogout(User *user);
@@ -38,6 +45,8 @@ private:
 	void actionPauseQueue(QString peer, QString queue, bool paused);
 	void actionLeaveQueue(QString peer, QString queue);
 
+	void callbackLogin(CallbackQuery *query);
+
 	QVariantMap populateUserInfo(User *user);
 	void broadcastUserEvent(User *sender, QHash<QString, User *> *receivers, User::Event event, QVariantMap fields);
 	void broadcastUserEvent(User *sender, User::Event event, QVariantMap fields);
@@ -46,6 +55,8 @@ private:
 private slots:
 	void openDatabaseConnection();
 	void connectToAsterisk();
+
+	void onDatabaseQueryFinished();
 
 	void onAsteriskConnected(QString version);
 	void onAsteriskDisconnected();

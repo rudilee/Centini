@@ -19,10 +19,12 @@ SOURCES     +=  main.cpp \
 				centiniserver.cpp \
 				desktopuser.cpp \
 				user.cpp \
-    webuser.cpp
+    webuser.cpp \
+    callbackquery.cpp
 
 HEADERS     +=  asteriskmanager.h \
 				centiniserver.h \
 				desktopuser.h \
 				user.h \
-    webuser.h
+    webuser.h \
+    callbackquery.h

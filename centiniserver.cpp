@@ -1,7 +1,10 @@
 #include <QCoreApplication>
-#include <QSqlQuery>
-#include <QSqlError>
 #include <QTimer>
+#include <QSqlError>
+#include <QtConcurrent/QtConcurrentRun>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QUuid>
 
 #include "centiniserver.h"
 #include "desktopuser.h"
@@ -37,52 +40,35 @@ void CentiniServer::run()
 	qDebug("Listening incoming connection");
 }
 
+void CentiniServer::executeQuery(CallbackQuery *query)
+{
+	QFutureWatcher<CallbackQuery *> *queryWatcher = query->queryWatcher();
+
+	connect(queryWatcher, SIGNAL(finished()), SLOT(onDatabaseQueryFinished()));
+
+	queryWatcher->setFuture(QtConcurrent::run([](CallbackQuery *query) -> CallbackQuery * {
+		if (!query->exec())
+			qDebug() << "Query failed, error:" << query->lastError().text();
+
+		return query;
+	}, query));
+}
+
 void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
 {
-	QVariantMap response;
-	bool success = false;
-	QString message = "Login failed.";
+	CallbackQuery *query = new CallbackQuery(database);
+	query->setQueryId(QUuid::createUuid().toString());
+	query->setType(CallbackQuery::CheckUserPassword);
+	query->setUser(user);
+	query->prepare("SELECT * FROM user WHERE password = :password");
+	query->bindValue(":password", passwordHash);
 
-	QSqlQuery query;
-	query.prepare("SELECT * FROM user WHERE password = :password");
-	query.bindValue(":password", passwordHash);
+	QVariantMap parameters;
+	parameters["username"] = username;
 
-	if (query.exec()) {
-		if (query.next()) {
-			success = true;
-			message = "Successfuly logged in.";
+	query->setParameters(parameters);
 
-			user->setUsername(username);
-			user->setFullname(query.value("fullname").toString());
-			user->setLevel((User::Level) user->enumIndex("Level", query.value("level").toString()));
-
-			switch (user->level()) {
-			case User::Manager:
-				managers[username] = user;
-
-				enumerateUserList(user, &supervisors);
-				enumerateUserList(user, &agents);
-				break;
-			case User::Supervisor:
-				supervisors[username] = user;
-
-				enumerateUserList(user, &agents);
-				break;
-			default:
-				agents[username] = user;
-
-				broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
-				break;
-			}
-		}
-	} else {
-		qDebug() << "Login query failed, error:" << query.lastError().text();
-	}
-
-	response["success"] = success;
-	response["message"] = message;
-
-	user->sendResponse(User::Login, response);
+	executeQuery(query);
 }
 
 void CentiniServer::actionLogout(User *user)
@@ -92,6 +78,11 @@ void CentiniServer::actionLogout(User *user)
 
 	broadcastUserEvent(user, User::LoggedOut, fields);
 
+	QVariantMap response;
+	response["success"] = true;
+	response["message"] = "Bye!";
+
+	user->sendResponse(User::Logout, response);
 	user->clearSession();
 	user->disconnect();
 }
@@ -134,6 +125,51 @@ void CentiniServer::actionPauseQueue(QString peer, QString queue, bool paused)
 void CentiniServer::actionLeaveQueue(QString peer, QString queue)
 {
 	asterisk->actionQueueRemove(queue, peer);
+}
+
+void CentiniServer::callbackLogin(CallbackQuery *query)
+{
+	QVariantMap response;
+	bool success = false;
+	QVariantMap parameters = query->parameters();
+	User *user = query->user();
+	QString username = parameters["username"].toString(),
+			message = "Login failed.";
+
+	if (query->next()) {
+		success = true;
+		message = "Successfuly logged in.";
+
+		user->setUsername(username);
+		user->setFullname(query->value("fullname").toString());
+		user->setLevel((User::Level) user->enumIndex("Level", query->value("level").toString()));
+
+		switch (user->level()) {
+		case User::Manager:
+			managers[username] = user;
+
+			enumerateUserList(user, &supervisors);
+			enumerateUserList(user, &agents);
+			break;
+		case User::Supervisor:
+			supervisors[username] = user;
+
+			enumerateUserList(user, &agents);
+			break;
+		default:
+			agents[username] = user;
+
+			broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
+			break;
+		}
+	} else {
+		qDebug() << "Login query failed, error:" << query->lastError().text();
+	}
+
+	response["success"] = success;
+	response["message"] = message;
+
+	user->sendResponse(User::Login, response);
 }
 
 QVariantMap CentiniServer::populateUserInfo(User *user)
@@ -185,6 +221,19 @@ void CentiniServer::connectToAsterisk()
 							settings->value("asterisk/port", 5038).toUInt());
 
 	qDebug("Connecting to Asterisk server");
+}
+
+void CentiniServer::onDatabaseQueryFinished()
+{
+	CallbackQuery *query = ((QFutureWatcher<CallbackQuery *> *) sender())->result();
+
+	switch (query->type()) {
+	case CallbackQuery::CheckUserPassword:
+		callbackLogin(query);
+		break;
+	}
+
+	delete query;
 }
 
 void CentiniServer::openDatabaseConnection()
@@ -308,8 +357,15 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 	User *user = (User *) sender();
 
 	if (action != User::Login) {
-		if (user->username().isEmpty())
+		if (user->username().isEmpty()) {
+			QVariantMap response;
+			response["success"] = false;
+			response["message"] = "Unauthorized access.";
+
+			user->sendResponse(User::Invalid, response);
+
 			return;
+		}
 	}
 
 	switch (action) {

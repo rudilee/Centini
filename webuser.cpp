@@ -39,6 +39,8 @@ void WebUser::parseMessage(QString message)
 
 	if (!actionText.isEmpty())
 		emit actionReceived((User::Action) enumIndex("Action", actionText), fields);
+	else
+		socket_->sendTextMessage("Unrecognized command..");
 }
 
 void WebUser::sendMessage(QVariantMap fields)
