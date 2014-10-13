@@ -29,9 +29,9 @@ public:
 		AgentComplete,
 		AgentConnect,
 		AgentDump,
+		AgentRingNoAnswer,
 		Agentlogin,
 		Agentlogoff,
-		AgentRingNoAnswer,
 		Alarm,
 		AlarmClear,
 		Bridge,
@@ -45,9 +45,9 @@ public:
 		ConfbridgeStart,
 		ConfbridgeTalking,
 		DAHDIChannel,
-		Dial,
 		DNDState,
 		DTMF,
+		Dial,
 		ExtensionStatus,
 		FullyBooted,
 		Hangup,
@@ -65,15 +65,15 @@ public:
 		MeetmeJoin,
 		MeetmeLeave,
 		MeetmeMute,
-		MeetmeTalking,
 		MeetmeTalkRequest,
+		MeetmeTalking,
 		MessageWaiting,
 		ModuleLoadReport,
 		NewAccountCode,
 		NewCallerid,
+		NewPeerAccount,
 		Newchannel,
 		Newexten,
-		NewPeerAccount,
 		Newstate,
 		OriginateResponse,
 		ParkedCall,
@@ -94,11 +94,20 @@ public:
 		SpanAlarm,
 		SpanAlarmClear,
 		UnParkedCall,
-		UserEvent,
-		VarSet
+		VarSet,
+		// Event yg gak ke dokumentasi
+		CoreShowChannel,
+		CoreShowChannelsComplete,
+		PeerEntry,
+		PeerlistComplete,
+		PeerStatus,
+		RTCPReceived,
+		RTCPSent
 	};
 
 	explicit AsteriskManager(QObject *parent = 0);
+
+	QString eventValue(AsteriskManager::Event event);
 
 	QString actionAbsoluteTimeout();
 	QString actionAgentLogoff();

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QDateTime>
 
 class User : public QObject
 {
@@ -80,6 +81,9 @@ public:
 	void setPhoneState(PhoneState phoneState);
 	PhoneState phoneState();
 
+	void setLastCall(QDateTime lastCall);
+	QDateTime lastCall();
+
 	virtual QString ipAddress() { return QString(); }
 
 	void initializeClient(qintptr socketDescriptor);
@@ -101,6 +105,7 @@ private:
 	Level level_;
 	QueueState queueState_;
 	PhoneState phoneState_;
+	QDateTime lastCall_;
 
 	QTcpSocket *client_;
 	QByteArray messageBuffer;

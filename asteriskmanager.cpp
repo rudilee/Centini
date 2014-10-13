@@ -10,6 +10,11 @@ AsteriskManager::AsteriskManager(QObject *parent) :
 	connect(this, SIGNAL(readyRead()), SLOT(onReadyRead()));
 }
 
+QString AsteriskManager::eventValue(AsteriskManager::Event event)
+{
+	return eventEnum.valueToKey(event);
+}
+
 QString AsteriskManager::actionAbsoluteTimeout()
 {
 	return sendAction("AbsoluteTimeout");

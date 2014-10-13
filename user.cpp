@@ -104,6 +104,16 @@ User::PhoneState User::phoneState()
 	return phoneState_;
 }
 
+void User::setLastCall(QDateTime lastCall)
+{
+	lastCall_ = lastCall;
+}
+
+QDateTime User::lastCall()
+{
+	return lastCall_;
+}
+
 void User::initializeClient(qintptr socketDescriptor)
 {
 	client_->setSocketDescriptor(socketDescriptor);

@@ -30,10 +30,20 @@ private:
 	AsteriskManager *asterisk;
 	QTcpServer *tcpServer;
 	QWebSocketServer *webSocketServer;
+	QHash<QString, QString> actionIds; // Action, ActionID
+	QHash<QString, QString> sipPeers; // IP Address, Peer
+	QHash<QString, QString> channels; // Channel, Peer
+	QHash<QString, int> channelStates; // Channel, Channel State
+	QHash<QString, QDateTime> channelLastCalls; // Channel, Last Call
+	QHash<QString, QString> users; // IP Address, Username
 	QHash<QString, User *> agents, supervisors, managers;
-	QString loginActionID;
 
 	void executeQuery(CallbackQuery *query);
+
+	User *lookupUser(QString ipAddress);
+	User::PhoneState phoneStateOf(int channelState);
+	QString channelPeer(QString channel);
+	QDateTime durationLastCall(QString duration);
 
 	void actionLogin(User *user, QString username, QString passwordHash);
 	void actionLogout(User *user);
@@ -69,7 +79,7 @@ private slots:
 	void onUserActionReceived(User::Action action, QVariantMap fields);
 	void onUserDisconnected();
 	void onUserQueueStateChanged(User::QueueState queueState);
-	void onUserPhoneStateChanged(User::PhoneState phoneState);
+	void onUserPhoneStateChanged(User::PhoneState phoneStateOf);
 	void onUserPeerChanged(QString peer);
 };
 

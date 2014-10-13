@@ -54,6 +54,78 @@ void CentiniServer::executeQuery(CallbackQuery *query)
 	}, query));
 }
 
+User *CentiniServer::lookupUser(QString ipAddress)
+{
+	QString username = users.value(ipAddress);
+
+	if (agents.contains(username))
+		return agents[username];
+	else if (supervisors.contains(username))
+		return supervisors[username];
+	else if (managers.contains(username))
+		return managers[username];
+
+	return NULL;
+}
+
+User::PhoneState CentiniServer::phoneStateOf(int channelState)
+{
+	switch (channelState) {
+	case 0: // Down
+	case 1: // Rsrvd
+	case 2: // OffHook
+		break;
+	case 3: // Dialing
+	case 4: // Ring
+	case 5: // Ringing
+		return User::Ringing;
+		break;
+	case 6: // Up
+	case 7: // Busy
+		return User::Busy;
+		break;
+	case 8: // Dialing Offhook
+	case 9: // Pre-ring
+	case 10: // Unknown
+	default:
+		break;
+	}
+
+	return User::Clear;
+}
+
+QString CentiniServer::channelPeer(QString channel)
+{
+	QRegExp channelPattern("^([a-z0-9]{3,5}/.+)\\-.+$");
+	QString peer;
+
+	if (channelPattern.indexIn(channel))
+		peer = channelPattern.cap(1);
+
+	return peer;
+}
+
+QDateTime CentiniServer::durationLastCall(QString duration)
+{
+	QDateTime lastCall = QDateTime();
+	QRegExp durationPattern("^([0-9]{2}):([0-9]{2}):([0-9]{2})$");
+
+	qDebug() << QDateTime::currentDateTime();
+	qDebug() << "Kampret:" << lastCall;
+
+	if (durationPattern.indexIn(duration) > -1) {
+		int hours = durationPattern.cap(1).toInt(),
+			minutes = durationPattern.cap(2).toInt(),
+			seconds = durationPattern.cap(3).toInt();
+
+		lastCall = QDateTime::currentDateTime().addSecs((hours * 3600 + minutes * 60 + seconds) * -1);
+	}
+
+	qDebug() << "Bijikaret:" << lastCall;
+
+	return lastCall;
+}
+
 void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
 {
 	CallbackQuery *query = new CallbackQuery(database);
@@ -140,9 +212,17 @@ void CentiniServer::callbackLogin(CallbackQuery *query)
 		success = true;
 		message = "Successfuly logged in.";
 
+		QString peer = sipPeers.value(user->ipAddress()),
+				channel = channels.key(peer);
+
 		user->setUsername(username);
 		user->setFullname(query->value("fullname").toString());
 		user->setLevel((User::Level) user->enumIndex("Level", query->value("level").toString()));
+		user->setPeer(peer);
+		user->setPhoneState(phoneStateOf(channelStates.value(channel)));
+		user->setLastCall(channelLastCalls.value(channel));
+
+		users[user->ipAddress()] = username;
 
 		switch (user->level()) {
 		case User::Manager:
@@ -178,9 +258,14 @@ QVariantMap CentiniServer::populateUserInfo(User *user)
 	fields["username"] = user->username();
 	fields["fullname"] = user->fullname();
 	fields["level"] = user->enumText("Level", user->level());
+	fields["peer"] = user->peer();
 	fields["queue_state"] = user->enumText("QueueState", user->queueState());
 	fields["phone_state"] = user->enumText("PhoneState", user->phoneState());
-	fields["peer"] = user->peer();
+
+	QDateTime lastCall = user->lastCall();
+
+	if (!lastCall.isNull())
+		fields["last_call"] = lastCall;
 
 	return fields;
 }
@@ -273,8 +358,8 @@ void CentiniServer::openDatabaseConnection()
 
 void CentiniServer::onAsteriskConnected(QString version)
 {
-	loginActionID = asterisk->actionLogin(settings->value("asterisk/username", "monitor").toString(),
-										  settings->value("asterisk/secret", "m0n1t0r").toString());
+	actionIds["Login"] = asterisk->actionLogin(settings->value("asterisk/username", "monitor").toString(),
+											   settings->value("asterisk/secret", "m0n1t0r").toString());
 
 	qDebug() << "Login to Asterisk server, AMI version:" << version;
 }
@@ -290,7 +375,7 @@ void CentiniServer::onAsteriskDisconnected()
 
 void CentiniServer::onAsteriskResponseSent(AsteriskManager::Response response, QVariantMap headers, QString actionID)
 {
-	if (actionID == loginActionID) {
+	if (actionID == actionIds.take("Login")) {
 		switch (response) {
 		case AsteriskManager::Success:
 			qDebug("Asterisk server connected");
@@ -305,10 +390,119 @@ void CentiniServer::onAsteriskResponseSent(AsteriskManager::Response response, Q
 
 void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVariantMap headers)
 {
-	if (event == AsteriskManager::FullyBooted) {
-		qDebug() << "SIPpeers:" << asterisk->actionSIPpeers();
-		qDebug() << "CoreStatus:" << asterisk->actionCoreStatus();
-		qDebug() << "CoreShowChannels:" << asterisk->actionCoreShowChannels();
+	QString actionId = headers["ActionID"].toString();
+
+	switch (event) {
+	case AsteriskManager::FullyBooted:
+		actionIds["SIPpeers"] = asterisk->actionSIPpeers();
+		actionIds["CoreShowChannels"] = asterisk->actionCoreShowChannels();
+
+		break;
+	case AsteriskManager::PeerEntry:
+		if (actionId == actionIds.value("SIPpeers"))
+			sipPeers[headers["IPaddress"].toString()] = QString("%1/%2").arg(headers["Channeltype"].toString(), headers["ObjectName"].toString());
+
+		break;
+	case AsteriskManager::PeerlistComplete:
+		if (actionId == actionIds.value("SIPpeers"))
+			actionIds.remove("SIPpeers");
+
+		break;
+	case AsteriskManager::PeerStatus:
+	{
+		QRegExp addressPattern("^(.+):[0-9]{2,5}$");
+		QString ipAddress,
+				peer =  headers["Peer"].toString(),
+				peerStatus = headers["PeerStatus"].toString();
+
+		if (addressPattern.indexIn(headers["Address"].toString()) > -1)
+			ipAddress = addressPattern.cap(1);
+		else
+			ipAddress = sipPeers.key(peer);
+
+		User *user = lookupUser(ipAddress);
+
+		if (user != NULL)
+			user->setPeer(peerStatus == "Registered" ? peer : QString());
+
+		if (peerStatus == "Unregistered")
+			sipPeers.remove(ipAddress);
+		else
+			sipPeers[ipAddress] = peer;
+	}
+
+		break;
+	case AsteriskManager::CoreShowChannel:
+	{
+		if (actionId == actionIds.value("CoreShowChannels")) {
+			QString channel = headers["Channel"].toString();
+
+			channels[channel] = channelPeer(channel);
+			channelStates[channel] = headers["ChannelState"].toInt();
+			channelLastCalls[channel] = durationLastCall(headers["Duration"].toString());
+
+			QDateTime test = channelLastCalls[channel];
+			QString duration = headers["Duration"].toString();
+			QString dummy;
+		}
+	}
+
+		break;
+	case AsteriskManager::CoreShowChannelsComplete:
+		if (actionId == actionIds.value("CoreShowChannels"))
+			actionIds.remove("CoreShowChannels");
+
+		break;
+	case AsteriskManager::Newchannel:
+	case AsteriskManager::Newstate:
+	{
+		QString channel = headers["Channel"].toString(),
+				peer = channelPeer(channel);
+
+		int channelState = headers["ChannelState"].toInt();
+
+		channels[channel] = peer;
+		channelStates[channel] = channelState;
+
+		User::PhoneState phoneState = phoneStateOf(channelState);
+		User *user = lookupUser(sipPeers.key(peer));
+
+		if (user != NULL) {
+			if (user->phoneState() != phoneState)
+				user->setPhoneState(phoneState);
+		}
+	}
+
+		break;
+	case AsteriskManager::Hangup:
+	{
+		QString channel = headers["Channel"].toString();
+
+		channels.remove(channel);
+		channelStates.remove(channel);
+		channelLastCalls.remove(channel);
+
+		User *user = lookupUser(sipPeers.key(channels.value(channel)));
+
+		if (user != NULL)
+			user->setPhoneState(User::Clear);
+	}
+
+		break;
+	default:
+		qDebug() << "==< Event:" << asterisk->eventValue(event);
+
+		QMapIterator<QString, QVariant> header(headers);
+
+		while (header.hasNext()) {
+			header.next();
+
+			qDebug() << header.key() << header.value();
+		}
+
+		qDebug("==>");
+
+		break;
 	}
 }
 
@@ -409,17 +603,22 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 void CentiniServer::onUserDisconnected()
 {
 	User *user = (User *) sender();
+	QString username = user->username();
 
-	switch (user->level()) {
-	case User::Manager:
-		managers.remove(user->username());
-		break;
-	case User::Supervisor:
-		supervisors.remove(user->username());
-		break;
-	default:
-		agents.remove(user->username());
-		break;
+	if (!username.isEmpty()) {
+		users.remove(user->ipAddress());
+
+		switch (user->level()) {
+		case User::Manager:
+			managers.remove(username);
+			break;
+		case User::Supervisor:
+			supervisors.remove(username);
+			break;
+		default:
+			agents.remove(username);
+			break;
+		}
 	}
 
 	user->deleteLater();
