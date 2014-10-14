@@ -46,6 +46,11 @@ private:
 
 	void removeAction(QString action, QString actionId);
 
+	void addSipPeer(QVariantMap headers);
+
+	void addChannel(QVariantMap headers);
+	void removeChannel(QVariantMap headers);
+
 	void addQueueMember(QVariantMap headers);
 	void pauseQueueMember(QVariantMap headers);
 	void removeQueueMember(QVariantMap headers);
@@ -54,6 +59,7 @@ private:
 	User::PhoneState phoneStateOf(int channelState);
 	QString channelPeer(QString channel);
 	QDateTime durationLastCall(QString duration);
+	QString lookupQueue(QString peer);
 
 	void actionLogin(User *user, QString username, QString passwordHash);
 	void actionLogout(User *user);
@@ -62,7 +68,7 @@ private:
 	void actionSpy(User *user, QString target);
 	void actionWhisper(User *user, QString target);
 	void actionJoinQueue(QString peer, QString queue);
-	void actionPauseQueue(QString peer, QString queue, bool paused);
+	void actionPauseQueue(QString peer, QString queue, bool paused, QString reason);
 	void actionLeaveQueue(QString peer, QString queue);
 
 	QVariantMap populateUserInfo(User *user);
