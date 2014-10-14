@@ -30,15 +30,26 @@ private:
 	AsteriskManager *asterisk;
 	QTcpServer *tcpServer;
 	QWebSocketServer *webSocketServer;
+
 	QHash<QString, QString> actionIds; // Action, ActionID
+
 	QHash<QString, QString> sipPeers; // IP Address, Peer
+
 	QHash<QString, QString> channels; // Channel, Peer
 	QHash<QString, int> channelStates; // Channel, Channel State
 	QHash<QString, QDateTime> channelLastCalls; // Channel, Last Call
+
+	QStringList queues;
+	QHash<QString, QStringList> queueMembers; // Queue, Peers
+
 	QHash<QString, QString> users; // IP Address, Username
 	QHash<QString, User *> agents, supervisors, managers;
 
 	void executeQuery(CallbackQuery *query);
+	void removeAction(QString action);
+	void addQueueMember(QVariantMap headers);
+	void pauseQueueMember(QvariantMap headers);
+	void removeQueueMember(QVariantMap headers);
 
 	User *lookupUser(QString ipAddress);
 	User::PhoneState phoneStateOf(int channelState);
@@ -78,9 +89,9 @@ private slots:
 
 	void onUserActionReceived(User::Action action, QVariantMap fields);
 	void onUserDisconnected();
-	void onUserQueueStateChanged(User::QueueState queueState);
-	void onUserPhoneStateChanged(User::PhoneState phoneStateOf);
 	void onUserPeerChanged(QString peer);
+	void onUserPhoneStateChanged(User::PhoneState phoneStateOf);
+	void onUserQueueStateChanged(User::QueueState queueState);
 };
 
 #endif // CENTINISERVER_H

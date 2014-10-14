@@ -75,8 +75,9 @@ public:
 	void setQueue(QString queue);
 	QString queue();
 
-	void setQueueState(QueueState queueState);
+	void setQueueState(QueueState queueState, QString pauseReason = QString());
 	QueueState queueState() const;
+	QString pauseReason();
 
 	void setPhoneState(PhoneState phoneState);
 	PhoneState phoneState();
@@ -92,8 +93,12 @@ public:
 	void clearSession();
 	virtual void disconnect() {}
 
-	QString enumText(QString enumName, int index);
-	int enumIndex(QString enumName, QString text);
+	QString levelText(int index = -1);
+	QString phoneStateText(int index = -1);
+	QString queueStateText(int index = -1);
+
+	int levelIndex(QString text);
+	int actionIndex(QString text);
 
 protected:
 	int timerId;
@@ -101,7 +106,7 @@ protected:
 	void timerEvent(QTimerEvent *event);
 
 private:
-	QString username_, fullname_, peer_, queue_;
+	QString username_, fullname_, peer_, queue_, pauseReason_;
 	Level level_;
 	QueueState queueState_;
 	PhoneState phoneState_;
@@ -109,6 +114,9 @@ private:
 
 	QTcpSocket *client_;
 	QByteArray messageBuffer;
+
+	QString enumText(QString enumName, int index);
+	int enumIndex(QString enumName, QString text);
 
 	virtual void sendMessage(QVariantMap fields) { Q_UNUSED(fields) }
 

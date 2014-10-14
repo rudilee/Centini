@@ -54,6 +54,58 @@ void CentiniServer::executeQuery(CallbackQuery *query)
 	}, query));
 }
 
+void CentiniServer::removeAction(QString action)
+{
+	if (actionId == actionIds.value(action))
+		actionIds.remove(action);
+}
+
+void CentiniServer::addQueueMember(QVariantMap headers)
+{
+	QString queue = headers["Queue"].toString(),
+			location = headers["Location"].toString();
+
+	if (!location.isEmpty()) {
+		queueMembers[queue] << location;
+
+		User *user = lookupUser(sipPeers.key(location));
+
+		if (user != NULL) {
+			user->setQueue(queue);
+			user->setQueueState(User::Joined);
+		}
+	}
+}
+
+void CentiniServer::pauseQueueMember(QvariantMap headers)
+{
+	QString location = headers["Location"].toString();
+
+	if (!location.isEmpty()) {
+		User *user = lookupUser(sipPeers.key(location));
+
+		if (user != NULL)
+			user->setQueueState(headers["Paused"].toUInt() == 1 ? User::Paused : User::Joined, headers["Reason"].toString());
+	}
+}
+
+void CentiniServer::removeQueueMember(QVariantMap headers)
+{
+	QString queue = headers["Queue"].toString(),
+			location = headers["Location"].toString();
+
+	if (!location.isEmpty()) {
+		queueMembers.value(queue).removeAll(location);
+
+		User *user = lookupUser(sipPeers.key(location));
+
+		if (user != NULL) {
+			user->setQueue(QString());
+			user->setQueueState(User::None);
+		}
+	}
+}
+
 User *CentiniServer::lookupUser(QString ipAddress)
 {
 	QString username = users.value(ipAddress);
@@ -96,10 +148,10 @@ User::PhoneState CentiniServer::phoneStateOf(int channelState)
 
 QString CentiniServer::channelPeer(QString channel)
 {
-	QRegExp channelPattern("^([a-z0-9]{3,5}/.+)\\-.+$");
+	QRegExp channelPattern("^(.+)\\-.+$");
 	QString peer;
 
-	if (channelPattern.indexIn(channel))
+	if (channelPattern.indexIn(channel) > -1)
 		peer = channelPattern.cap(1);
 
 	return peer;
@@ -110,9 +162,6 @@ QDateTime CentiniServer::durationLastCall(QString duration)
 	QDateTime lastCall = QDateTime();
 	QRegExp durationPattern("^([0-9]{2}):([0-9]{2}):([0-9]{2})$");
 
-	qDebug() << QDateTime::currentDateTime();
-	qDebug() << "Kampret:" << lastCall;
-
 	if (durationPattern.indexIn(duration) > -1) {
 		int hours = durationPattern.cap(1).toInt(),
 			minutes = durationPattern.cap(2).toInt(),
@@ -120,8 +169,6 @@ QDateTime CentiniServer::durationLastCall(QString duration)
 
 		lastCall = QDateTime::currentDateTime().addSecs((hours * 3600 + minutes * 60 + seconds) * -1);
 	}
-
-	qDebug() << "Bijikaret:" << lastCall;
 
 	return lastCall;
 }
@@ -217,10 +264,14 @@ void CentiniServer::callbackLogin(CallbackQuery *query)
 
 		user->setUsername(username);
 		user->setFullname(query->value("fullname").toString());
-		user->setLevel((User::Level) user->enumIndex("Level", query->value("level").toString()));
+		user->setLevel((User::Level) user->levelIndex(query->value("level").toString()));
+		user->setLastCall(channelLastCalls.value(channel));
 		user->setPeer(peer);
 		user->setPhoneState(phoneStateOf(channelStates.value(channel)));
-		user->setLastCall(channelLastCalls.value(channel));
+
+		connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
+		connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
+		connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
 
 		users[user->ipAddress()] = username;
 
@@ -257,15 +308,15 @@ QVariantMap CentiniServer::populateUserInfo(User *user)
 	QVariantMap fields;
 	fields["username"] = user->username();
 	fields["fullname"] = user->fullname();
-	fields["level"] = user->enumText("Level", user->level());
+	fields["level"] = user->levelText();
 	fields["peer"] = user->peer();
-	fields["queue_state"] = user->enumText("QueueState", user->queueState());
-	fields["phone_state"] = user->enumText("PhoneState", user->phoneState());
+	fields["phone_state"] = user->phoneStateText();
+	fields["queue_state"] = user->queueStateText();
 
 	QDateTime lastCall = user->lastCall();
 
 	if (!lastCall.isNull())
-		fields["last_call"] = lastCall;
+		fields["duration"] = lastCall.secsTo(QDateTime::currentDateTime());
 
 	return fields;
 }
@@ -396,6 +447,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 	case AsteriskManager::FullyBooted:
 		actionIds["SIPpeers"] = asterisk->actionSIPpeers();
 		actionIds["CoreShowChannels"] = asterisk->actionCoreShowChannels();
+		actionIds["QueueStatus"] = asterisk->actionQueueStatus();
 
 		break;
 	case AsteriskManager::PeerEntry:
@@ -404,8 +456,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::PeerlistComplete:
-		if (actionId == actionIds.value("SIPpeers"))
-			actionIds.remove("SIPpeers");
+		removeAction("SIPpeers");
 
 		break;
 	case AsteriskManager::PeerStatus:
@@ -440,17 +491,12 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 			channels[channel] = channelPeer(channel);
 			channelStates[channel] = headers["ChannelState"].toInt();
 			channelLastCalls[channel] = durationLastCall(headers["Duration"].toString());
-
-			QDateTime test = channelLastCalls[channel];
-			QString duration = headers["Duration"].toString();
-			QString dummy;
 		}
 	}
 
 		break;
 	case AsteriskManager::CoreShowChannelsComplete:
-		if (actionId == actionIds.value("CoreShowChannels"))
-			actionIds.remove("CoreShowChannels");
+		removeAction("CoreShowChannels");
 
 		break;
 	case AsteriskManager::Newchannel:
@@ -484,10 +530,48 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		User *user = lookupUser(sipPeers.key(channels.value(channel)));
 
-		if (user != NULL)
+		if (user != NULL) {
+			user->setLastCall(QDateTime());
 			user->setPhoneState(User::Clear);
+		}
 	}
 
+		break;
+	case AsteriskManager::QueueParams:
+		if (actionId == actionIds.value("QueueStatus")) {
+			QString queue = headers["queue"].toString();
+
+			if (!queue.isEmpty())
+				queues << queue;
+		}
+
+		break;
+	case AsteriskManager::QueueMember:
+		if (actionId == actionIds.value("QueueStatus"))
+			addQueueMember(headers);
+
+		break;
+	case AsteriskManager::QueueStatusComplete:
+		removeAction("QueueStatus");
+
+		break;
+	case AsteriskManager::QueueMemberAdded:
+		addQueueMember(headers);
+
+		break;
+	case AsteriskManager::QueueMemberPaused:
+		break;
+	case AsteriskManager::QueueMemberRemoved:
+		removeQueueMember(headers);
+
+		break;
+	case AsteriskManager::QueueMemberStatus:
+		break;
+	case AsteriskManager::RTCPReceived:
+	case AsteriskManager::RTCPSent:
+	case AsteriskManager::Newexten:
+	case AsteriskManager::NewCallerid:
+	case AsteriskManager::VarSet:
 		break;
 	default:
 		qDebug() << "==< Event:" << asterisk->eventValue(event);
@@ -515,9 +599,6 @@ void CentiniServer::onTcpServerNewConnection()
 
 	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
 	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
-	connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
-	connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
-	connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
 
 	user->setSocket(tcpServer->nextPendingConnection());
 	user->sendEvent(User::ActionReady, fields);
@@ -535,9 +616,6 @@ void CentiniServer::onWebSocketServerNewConnection()
 
 	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
 	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
-	connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
-	connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
-	connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
 
 	user->setSocket(webSocketServer->nextPendingConnection());
 	user->sendEvent(User::ActionReady, fields);
@@ -617,33 +695,19 @@ void CentiniServer::onUserDisconnected()
 			break;
 		default:
 			agents.remove(username);
+
+			QVariantMap fields;
+			fields["username"] = username;
+
+			broadcastUserEvent(user, &supervisors, User::LoggedOut, fields);
+
 			break;
 		}
 	}
 
 	user->deleteLater();
-}
 
-void CentiniServer::onUserQueueStateChanged(User::QueueState queueState)
-{
-	User *user = (User *) sender();
-
-	QVariantMap fields;
-	fields["username"] = user->username();
-	fields["queue_state"] = user->enumText("QueueState", queueState);
-
-	broadcastUserEvent(user, User::QueueStateChanged, fields);
-}
-
-void CentiniServer::onUserPhoneStateChanged(User::PhoneState phoneState)
-{
-	User *user = (User *) sender();
-
-	QVariantMap fields;
-	fields["username"] = user->username();
-	fields["phone_state"] = user->enumText("PhoneState", phoneState);
-
-	broadcastUserEvent(user, User::PhoneStateChanged, fields);
+	qDebug() << "User disconnected, username:" << username;
 }
 
 void CentiniServer::onUserPeerChanged(QString peer)
@@ -655,4 +719,31 @@ void CentiniServer::onUserPeerChanged(QString peer)
 	fields["peer"] = peer;
 
 	broadcastUserEvent(user, User::PeerChanged, fields);
+}
+
+void CentiniServer::onUserPhoneStateChanged(User::PhoneState phoneState)
+{
+	User *user = (User *) sender();
+
+	QVariantMap fields;
+	fields["username"] = user->username();
+	fields["phone_state"] = user->phoneStateText(phoneState);
+
+	broadcastUserEvent(user, User::PhoneStateChanged, fields);
+}
+
+void CentiniServer::onUserQueueStateChanged(User::QueueState queueState)
+{
+	User *user = (User *) sender();
+
+	QVariantMap fields;
+	fields["username"] = user->username();
+	fields["queue_state"] = user->queueStateText(queueState);
+
+	QString pauseReason = user->pauseReason();
+
+	if (!pauseReason.isEmpty())
+		fields["pause_reason"] = pauseReason;
+
+	broadcastUserEvent(user, User::QueueStateChanged, fields);
 }

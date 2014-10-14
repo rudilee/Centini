@@ -80,9 +80,16 @@ QString User::queue()
 	return queue_;
 }
 
-void User::setQueueState(User::QueueState queueState)
+void User::setQueueState(User::QueueState queueState, QString pauseReason)
 {
 	queueState_ = queueState;
+	pauseReason_ = pauseReason;
+
+	QVariantMap fields;
+	fields["username"] = username_;
+	fields["queue_state"] = queueStateText(queueState);
+
+	sendEvent(User::QueueStateChanged, fields);
 
 	emit queueStateChanged(queueState);
 }
@@ -92,9 +99,23 @@ User::QueueState User::queueState() const
 	return queueState_;
 }
 
+QString User::pauseReason()
+{
+	return pauseReason_;
+}
+
 void User::setPhoneState(User::PhoneState phoneState)
 {
 	phoneState_ = phoneState;
+
+	QVariantMap fields;
+	fields["username"] = username_;
+	fields["phone_state"] = phoneStateText(phoneState);
+
+	if (!lastCall_.isNull())
+		fields["duration"] = lastCall_.secsTo(QDateTime::currentDateTime());
+
+	sendEvent(User::PhoneStateChanged, fields);
 
 	emit phoneStateChanged(phoneState);
 }
@@ -143,6 +164,36 @@ void User::clearSession()
 	queue_.clear();
 }
 
+QString User::levelText(int index)
+{
+	return enumText("Level", index < 0 ? level_ : index);
+}
+
+QString User::phoneStateText(int index)
+{
+	return enumText("PhoneState", index < 0 ? phoneState_ : index);
+}
+
+QString User::queueStateText(int index)
+{
+	return enumText("QueueState", index < 0 ? queueState_ : index);
+}
+
+int User::levelIndex(QString text)
+{
+	return enumIndex("Level", text);
+}
+
+int User::actionIndex(QString text)
+{
+	return enumIndex("Action", text);
+}
+
+void User::timerEvent(QTimerEvent *event)
+{
+	disconnect();
+}
+
 QString User::enumText(QString enumName, int index)
 {
 	const QMetaObject *object = metaObject();
@@ -155,9 +206,4 @@ int User::enumIndex(QString enumName, QString text)
 	const QMetaObject *object = metaObject();
 
 	return object->enumerator(object->indexOfEnumerator(enumName.toLatin1().data())).keysToValue(text.toLatin1().data());
-}
-
-void User::timerEvent(QTimerEvent *event)
-{
-	disconnect();
 }

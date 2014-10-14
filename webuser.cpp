@@ -38,7 +38,7 @@ void WebUser::parseMessage(QString message)
 	QString actionText = fields.take("action").toString();
 
 	if (!actionText.isEmpty())
-		emit actionReceived((User::Action) enumIndex("Action", actionText), fields);
+		emit actionReceived((User::Action) actionIndex(actionText), fields);
 	else
 		socket_->sendTextMessage("Unrecognized command..");
 }

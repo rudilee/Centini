@@ -95,12 +95,15 @@ public:
 		SpanAlarmClear,
 		UnParkedCall,
 		VarSet,
-		// Event yg gak ke dokumentasi
+		// Event yg gak ke dokumentasi di 'make full' asterisk
 		CoreShowChannel,
 		CoreShowChannelsComplete,
 		PeerEntry,
 		PeerlistComplete,
 		PeerStatus,
+		QueueMember,
+		QueueParams,
+		QueueStatusComplete,
 		RTCPReceived,
 		RTCPSent
 	};
