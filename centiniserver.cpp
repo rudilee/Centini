@@ -1,9 +1,7 @@
 #include <QCoreApplication>
 #include <QTimer>
+#include <QSqlQuery>
 #include <QSqlError>
-#include <QtConcurrent/QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
 #include <QUuid>
 
 #include "centiniserver.h"
@@ -40,21 +38,7 @@ void CentiniServer::run()
 	qDebug("Listening incoming connection");
 }
 
-void CentiniServer::executeQuery(CallbackQuery *query)
-{
-	QFutureWatcher<CallbackQuery *> *queryWatcher = query->queryWatcher();
-
-	connect(queryWatcher, SIGNAL(finished()), SLOT(onDatabaseQueryFinished()));
-
-	queryWatcher->setFuture(QtConcurrent::run([](CallbackQuery *query) -> CallbackQuery * {
-		if (!query->exec())
-			qDebug() << "Query failed, error:" << query->lastError().text();
-
-		return query;
-	}, query));
-}
-
-void CentiniServer::removeAction(QString action)
+void CentiniServer::removeAction(QString action, QString actionId)
 {
 	if (actionId == actionIds.value(action))
 		actionIds.remove(action);
@@ -77,7 +61,7 @@ void CentiniServer::addQueueMember(QVariantMap headers)
 	}
 }
 
-void CentiniServer::pauseQueueMember(QvariantMap headers)
+void CentiniServer::pauseQueueMember(QVariantMap headers)
 {
 	QString location = headers["Location"].toString();
 
@@ -95,7 +79,8 @@ void CentiniServer::removeQueueMember(QVariantMap headers)
 			location = headers["Location"].toString();
 
 	if (!location.isEmpty()) {
-		queueMembers.value(queue).removeAll(location);
+		if (queueMembers.contains(queue))
+			queueMembers[queue].removeAll(location);
 
 		User *user = lookupUser(sipPeers.key(location));
 
@@ -175,19 +160,63 @@ QDateTime CentiniServer::durationLastCall(QString duration)
 
 void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
 {
-	CallbackQuery *query = new CallbackQuery(database);
-	query->setQueryId(QUuid::createUuid().toString());
-	query->setType(CallbackQuery::CheckUserPassword);
-	query->setUser(user);
-	query->prepare("SELECT * FROM user WHERE password = :password");
-	query->bindValue(":password", passwordHash);
+	QSqlQuery query;
+	query.prepare("SELECT * FROM user WHERE password = :password");
+	query.bindValue(":password", passwordHash);
 
-	QVariantMap parameters;
-	parameters["username"] = username;
+	QString message = "Login failed.";
+	bool success = query.exec();
 
-	query->setParameters(parameters);
+	if (success) {
+		success = query.next();
 
-	executeQuery(query);
+		if (success) {
+			message = "Successfuly logged in.";
+
+			QString peer = sipPeers.value(user->ipAddress()),
+					channel = channels.key(peer);
+
+			user->setUsername(username);
+			user->setFullname(query.value("fullname").toString());
+			user->setLevel((User::Level) user->levelIndex(query.value("level").toString()));
+			user->setLastCall(channelLastCalls.value(channel));
+			user->setPeer(peer);
+			user->setPhoneState(phoneStateOf(channelStates.value(channel)));
+
+			connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
+			connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
+			connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
+
+			users[user->ipAddress()] = username;
+
+			switch (user->level()) {
+			case User::Manager:
+				managers[username] = user;
+
+				enumerateUserList(user, &supervisors);
+				enumerateUserList(user, &agents);
+				break;
+			case User::Supervisor:
+				supervisors[username] = user;
+
+				enumerateUserList(user, &agents);
+				break;
+			default:
+				agents[username] = user;
+
+				broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
+				break;
+			}
+		}
+	} else {
+		qDebug() << "Login query failed, error:" << query.lastError().text();
+	}
+
+	QVariantMap response;
+	response["success"] = success;
+	response["message"] = message;
+
+	user->sendResponse(User::Login, response);
 }
 
 void CentiniServer::actionLogout(User *user)
@@ -202,7 +231,6 @@ void CentiniServer::actionLogout(User *user)
 	response["message"] = "Bye!";
 
 	user->sendResponse(User::Logout, response);
-	user->clearSession();
 	user->disconnect();
 }
 
@@ -244,63 +272,6 @@ void CentiniServer::actionPauseQueue(QString peer, QString queue, bool paused)
 void CentiniServer::actionLeaveQueue(QString peer, QString queue)
 {
 	asterisk->actionQueueRemove(queue, peer);
-}
-
-void CentiniServer::callbackLogin(CallbackQuery *query)
-{
-	QVariantMap response;
-	bool success = false;
-	QVariantMap parameters = query->parameters();
-	User *user = query->user();
-	QString username = parameters["username"].toString(),
-			message = "Login failed.";
-
-	if (query->next()) {
-		success = true;
-		message = "Successfuly logged in.";
-
-		QString peer = sipPeers.value(user->ipAddress()),
-				channel = channels.key(peer);
-
-		user->setUsername(username);
-		user->setFullname(query->value("fullname").toString());
-		user->setLevel((User::Level) user->levelIndex(query->value("level").toString()));
-		user->setLastCall(channelLastCalls.value(channel));
-		user->setPeer(peer);
-		user->setPhoneState(phoneStateOf(channelStates.value(channel)));
-
-		connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
-		connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
-		connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
-
-		users[user->ipAddress()] = username;
-
-		switch (user->level()) {
-		case User::Manager:
-			managers[username] = user;
-
-			enumerateUserList(user, &supervisors);
-			enumerateUserList(user, &agents);
-			break;
-		case User::Supervisor:
-			supervisors[username] = user;
-
-			enumerateUserList(user, &agents);
-			break;
-		default:
-			agents[username] = user;
-
-			broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
-			break;
-		}
-	} else {
-		qDebug() << "Login query failed, error:" << query->lastError().text();
-	}
-
-	response["success"] = success;
-	response["message"] = message;
-
-	user->sendResponse(User::Login, response);
 }
 
 QVariantMap CentiniServer::populateUserInfo(User *user)
@@ -357,19 +328,6 @@ void CentiniServer::connectToAsterisk()
 							settings->value("asterisk/port", 5038).toUInt());
 
 	qDebug("Connecting to Asterisk server");
-}
-
-void CentiniServer::onDatabaseQueryFinished()
-{
-	CallbackQuery *query = ((QFutureWatcher<CallbackQuery *> *) sender())->result();
-
-	switch (query->type()) {
-	case CallbackQuery::CheckUserPassword:
-		callbackLogin(query);
-		break;
-	}
-
-	delete query;
 }
 
 void CentiniServer::openDatabaseConnection()
@@ -456,7 +414,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::PeerlistComplete:
-		removeAction("SIPpeers");
+		removeAction("SIPpeers", actionId);
 
 		break;
 	case AsteriskManager::PeerStatus:
@@ -496,7 +454,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::CoreShowChannelsComplete:
-		removeAction("CoreShowChannels");
+		removeAction("CoreShowChannels", actionId);
 
 		break;
 	case AsteriskManager::Newchannel:
@@ -521,19 +479,24 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::Hangup:
+	case AsteriskManager::HangupRequest:
+	case AsteriskManager::SoftHangupRequest:
 	{
-		QString channel = headers["Channel"].toString();
+		QString channel = headers["Channel"].toString(),
+				ipAddress = sipPeers.key(channels.value(channel));
+
+		if (!ipAddress.isEmpty()) {
+			User *user = lookupUser(ipAddress);
+
+			if (user != NULL) {
+				user->setLastCall(QDateTime());
+				user->setPhoneState(User::Clear);
+			}
+		}
 
 		channels.remove(channel);
 		channelStates.remove(channel);
 		channelLastCalls.remove(channel);
-
-		User *user = lookupUser(sipPeers.key(channels.value(channel)));
-
-		if (user != NULL) {
-			user->setLastCall(QDateTime());
-			user->setPhoneState(User::Clear);
-		}
 	}
 
 		break;
@@ -552,7 +515,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::QueueStatusComplete:
-		removeAction("QueueStatus");
+		removeAction("QueueStatus", actionId);
 
 		break;
 	case AsteriskManager::QueueMemberAdded:

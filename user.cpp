@@ -1,26 +1,32 @@
 #include <QMetaEnum>
-#include <QQueue>
+#include <QSqlQuery>
+#include <QSqlError>
 
 #include "user.h"
 
 User::User(QObject *parent) :
 	QObject(parent),
-	client_(new QTcpSocket)
+	sessionId(0),
+	pauseId(0)
 {
 	timerId = startTimer(15000);
 }
 
 User::~User()
 {
-	delete client_;
+	if (!username_.isEmpty())
+		finishSession();
 }
 
 void User::setUsername(QString username)
 {
 	username_ = username;
 
-	if (!username.isEmpty())
+	if (!username.isEmpty()) {
 		killTimer(timerId);
+
+		startSession();
+	}
 }
 
 QString User::username()
@@ -89,6 +95,11 @@ void User::setQueueState(User::QueueState queueState, QString pauseReason)
 	fields["username"] = username_;
 	fields["queue_state"] = queueStateText(queueState);
 
+	if (queueState == User::Paused)
+		startPause();
+	else if (pauseId > 0)
+		finishPause();
+
 	sendEvent(User::QueueStateChanged, fields);
 
 	emit queueStateChanged(queueState);
@@ -135,11 +146,6 @@ QDateTime User::lastCall()
 	return lastCall_;
 }
 
-void User::initializeClient(qintptr socketDescriptor)
-{
-	client_->setSocketDescriptor(socketDescriptor);
-}
-
 void User::sendResponse(User::Action action, QVariantMap fields)
 {
 	fields["type"] = "Response";
@@ -154,14 +160,6 @@ void User::sendEvent(User::Event event, QVariantMap fields)
 	fields["event"] = enumText("Event", event);
 
 	sendMessage(fields);
-}
-
-void User::clearSession()
-{
-	username_.clear();
-	fullname_.clear();
-	peer_.clear();
-	queue_.clear();
 }
 
 QString User::levelText(int index)
@@ -206,4 +204,51 @@ int User::enumIndex(QString enumName, QString text)
 	const QMetaObject *object = metaObject();
 
 	return object->enumerator(object->indexOfEnumerator(enumName.toLatin1().data())).keysToValue(text.toLatin1().data());
+}
+
+void User::startSession()
+{
+	QSqlQuery query;
+	query.prepare("INSERT INTO user_session_log (username, start) VALUES (:username, :start)");
+	query.bindValue(":username", username_);
+	query.bindValue(":start", QDateTime::currentDateTime());
+
+	if (query.exec())
+		sessionId = query.lastInsertId().toUInt();
+	else
+		qDebug() << "Session start query error:" << query.lastError().text();
+}
+
+void User::finishSession()
+{
+	QSqlQuery query;
+	query.prepare("UPDATE user_session_log SET finish = :finish WHERE id = :id");
+	query.bindValue(":finish", QDateTime::currentDateTime());
+	query.bindValue(":id", sessionId);
+
+	if (!query.exec())
+		qDebug() << "Session finish query error:" << query.lastError().text();
+}
+
+void User::startPause()
+{
+	QSqlQuery query;
+	query.prepare("INSERT INTO user_pause_log (username, start, reason) VALUES (:username, :start, :reason)");
+	query.bindValue(":username", username_);
+	query.bindValue(":start", QDateTime::currentDateTime());
+	query.bindValue(":reason", pauseReason_);
+
+	if (!query.exec())
+		qDebug() << "Pause start query error:" << query.lastError().text();
+}
+
+void User::finishPause()
+{
+	QSqlQuery query;
+	query.prepare("UPDATE user_pause_log SET finish = :finish WHERE id = :id");
+	query.bindValue(":finish", QDateTime::currentDateTime());
+	query.bindValue(":id", pauseId);
+
+	if (!query.exec())
+		qDebug() << "Pause finish query error:" << query.lastError().text();
 }

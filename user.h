@@ -87,10 +87,8 @@ public:
 
 	virtual QString ipAddress() { return QString(); }
 
-	void initializeClient(qintptr socketDescriptor);
 	void sendResponse(User::Action action, QVariantMap fields);
 	void sendEvent(User::Event event, QVariantMap fields);
-	void clearSession();
 	virtual void disconnect() {}
 
 	QString levelText(int index = -1);
@@ -106,6 +104,7 @@ protected:
 	void timerEvent(QTimerEvent *event);
 
 private:
+	uint sessionId, pauseId;
 	QString username_, fullname_, peer_, queue_, pauseReason_;
 	Level level_;
 	QueueState queueState_;
@@ -117,6 +116,12 @@ private:
 
 	QString enumText(QString enumName, int index);
 	int enumIndex(QString enumName, QString text);
+
+	void startSession();
+	void finishSession();
+
+	void startPause();
+	void finishPause();
 
 	virtual void sendMessage(QVariantMap fields) { Q_UNUSED(fields) }
 
