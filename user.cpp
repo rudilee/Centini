@@ -83,7 +83,12 @@ void User::setQueue(QString queue)
 
 QString User::queue()
 {
-	return queue_;
+    return queue_;
+}
+
+QStringList User::queues()
+{
+    return QStringList();
 }
 
 void User::setQueueState(User::QueueState queueState, QString pauseReason)
@@ -94,11 +99,6 @@ void User::setQueueState(User::QueueState queueState, QString pauseReason)
 	QVariantMap fields;
 	fields["username"] = username_;
 	fields["queue_state"] = queueStateText(queueState);
-
-	if (queueState == User::Paused)
-		startPause();
-	else if (pauseId > 0)
-		finishPause();
 
 	sendEvent(User::QueueStateChanged, fields);
 
@@ -144,6 +144,31 @@ void User::setLastCall(QDateTime lastCall)
 QDateTime User::lastCall()
 {
 	return lastCall_;
+}
+
+void User::startPause()
+{
+    QSqlQuery query;
+    query.prepare("INSERT INTO user_pause_log (username, start, reason) VALUES (:username, :start, :reason)");
+    query.bindValue(":username", username_);
+    query.bindValue(":start", QDateTime::currentDateTime());
+    query.bindValue(":reason", pauseReason_);
+
+    if (!query.exec())
+        qDebug() << "Pause start query error:" << query.lastError().text();
+}
+
+void User::finishPause()
+{
+    QSqlQuery query;
+    query.prepare("UPDATE user_pause_log SET finish = :finish WHERE id = :id");
+    query.bindValue(":finish", QDateTime::currentDateTime());
+    query.bindValue(":id", pauseId);
+
+    pauseId = 0;
+
+    if (!query.exec())
+        qDebug() << "Pause finish query error:" << query.lastError().text();
 }
 
 void User::sendResponse(User::Action action, QVariantMap fields)
@@ -228,27 +253,4 @@ void User::finishSession()
 
 	if (!query.exec())
 		qDebug() << "Session finish query error:" << query.lastError().text();
-}
-
-void User::startPause()
-{
-	QSqlQuery query;
-	query.prepare("INSERT INTO user_pause_log (username, start, reason) VALUES (:username, :start, :reason)");
-	query.bindValue(":username", username_);
-	query.bindValue(":start", QDateTime::currentDateTime());
-	query.bindValue(":reason", pauseReason_);
-
-	if (!query.exec())
-		qDebug() << "Pause start query error:" << query.lastError().text();
-}
-
-void User::finishPause()
-{
-	QSqlQuery query;
-	query.prepare("UPDATE user_pause_log SET finish = :finish WHERE id = :id");
-	query.bindValue(":finish", QDateTime::currentDateTime());
-	query.bindValue(":id", pauseId);
-
-	if (!query.exec())
-		qDebug() << "Pause finish query error:" << query.lastError().text();
 }

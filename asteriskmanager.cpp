@@ -486,7 +486,7 @@ QString AsteriskManager::actionQueuePause(QString interface, boolean paused, QSt
 	headers["Interface"] = interface;
 	headers["Paused"] = paused;
 
-	insertNotEmpty(&headers, "Queue", queue);
+    insertNotEmpty(&headers, "Queue", queue);
 	insertNotEmpty(&headers, "Reason", reason);
 
 	return sendAction("QueuePause", headers);

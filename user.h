@@ -46,7 +46,7 @@ public:
 		Spy,
 		Whisper,
 		JoinQueue,
-		PauseQueue,
+		Pause,
 		LeaveQueue
 	};
 
@@ -74,6 +74,7 @@ public:
 
 	void setQueue(QString queue);
 	QString queue();
+    QStringList queues();
 
 	void setQueueState(QueueState queueState, QString pauseReason = QString());
 	QueueState queueState() const;
@@ -86,6 +87,9 @@ public:
 	QDateTime lastCall();
 
 	virtual QString ipAddress() { return QString(); }
+
+    void startPause();
+    void finishPause();
 
 	void sendResponse(User::Action action, QVariantMap fields);
 	void sendEvent(User::Event event, QVariantMap fields);
@@ -119,9 +123,6 @@ private:
 
 	void startSession();
 	void finishSession();
-
-	void startPause();
-	void finishPause();
 
 	virtual void sendMessage(QVariantMap fields) { Q_UNUSED(fields) }
 

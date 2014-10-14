@@ -339,19 +339,18 @@ void CentiniServer::actionWhisper(User *user, QString target)
 		;
 }
 
-void CentiniServer::actionJoinQueue(QString peer, QString queue)
+void CentiniServer::actionPause(User *user, bool paused, QString reason)
 {
-	asterisk->actionQueueAdd(queue, peer);
-}
+    QString peer = user->peer();
 
-void CentiniServer::actionPauseQueue(QString peer, QString queue, bool paused, QString reason)
-{
-	asterisk->actionQueuePause(peer, paused, queue, reason);
-}
+    foreach (QString queue, user->queues()) {
+        asterisk->actionQueuePause(peer, paused, queue, reason);
+    }
 
-void CentiniServer::actionLeaveQueue(QString peer, QString queue)
-{
-	asterisk->actionQueueRemove(queue, peer);
+    if (paused)
+        user->startPause();
+    else
+        user->finishPause();
 }
 
 QVariantMap CentiniServer::populateUserInfo(User *user)
@@ -651,19 +650,11 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 	case User::Whisper:
 		actionWhisper(user, fields["username"].toString());
 
-		break;
-	case User::JoinQueue:
-		actionJoinQueue(user->peer(), fields["queue"].toString());
+        break;
+    case User::Pause:
+        actionPause(user->peer(), user->queue(), fields["paused"].toBool(), fields["pause_reason"].toString());
 
-		break;
-	case User::PauseQueue:
-		actionPauseQueue(user->peer(), user->queue(), fields["paused"].toBool(), fields["pause_reason"].toString());
-
-		break;
-	case User::LeaveQueue:
-		actionLeaveQueue(user->peer(), user->queue());
-
-		break;
+        break;
 	default:
 		QVariantMap response;
 		response["success"] = false;

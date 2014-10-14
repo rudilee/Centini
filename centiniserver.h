@@ -66,10 +66,8 @@ private:
 	void actionDial(QString peer, QString number);
 	void actionHangup(User *user, QString username);
 	void actionSpy(User *user, QString target);
-	void actionWhisper(User *user, QString target);
-	void actionJoinQueue(QString peer, QString queue);
-	void actionPauseQueue(QString peer, QString queue, bool paused, QString reason);
-	void actionLeaveQueue(QString peer, QString queue);
+    void actionWhisper(User *user, QString target);
+    void actionPause(User *user, bool paused, QString reason);
 
 	QVariantMap populateUserInfo(User *user);
 
