@@ -98,9 +98,11 @@ public:
 		// Event yg gak ke dokumentasi di 'make full' asterisk
 		CoreShowChannel,
 		CoreShowChannelsComplete,
+		MusicOnHold,
 		PeerEntry,
 		PeerlistComplete,
 		PeerStatus,
+		QueueEntry,
 		QueueMember,
 		QueueParams,
 		QueueStatusComplete,
@@ -199,7 +201,7 @@ public:
 	QString actionParkinglots();
 	QString actionPauseMonitor();
 	QString actionPing();
-	QString actionPlayDTMF();
+	QString actionPlayDTMF(QString channel, QChar digit);
 	QString actionPresenceState();
 	QString actionPRIShowSpans();
 	QString actionQueueAdd(QString queue,
@@ -219,7 +221,14 @@ public:
 	QString actionQueues();
 	QString actionQueueStatus(QString queue = QString(), QString member = QString());
 	QString actionQueueSummary();
-	QString actionRedirect();
+	QString actionRedirect(QString channel,
+						   QString exten,
+						   QString context,
+						   uint priority,
+						   QString extraChannel = QString(),
+						   QString extraExten = QString(),
+						   QString extraContext = QString(),
+						   uint extraPriority = 0);
 	QString actionReload();
 	QString actionSendText();
 	QString actionSetvar();

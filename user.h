@@ -43,11 +43,12 @@ public:
 		Logout,
 		Dial,
 		Hangup,
+		Transfer,
+		SendDigit,
 		Spy,
 		Whisper,
-		JoinQueue,
+		Barge,
 		Pause,
-		LeaveQueue
 	};
 
 	enum Event {
@@ -55,7 +56,6 @@ public:
 		LoggedIn,
 		LoggedOut,
 		PeerChanged,
-		QueueChanged,
 		QueueStateChanged,
 		PhoneStateChanged
 	};
@@ -72,11 +72,12 @@ public:
 	void setPeer(QString peer);
 	QString peer();
 
-	void setQueue(QString queue);
-	QString queue();
+	void addQueue(QString queue);
+	void removeQueue(QString queue);
+	void setQueues(QStringList queues);
     QStringList queues();
 
-	void setQueueState(QueueState queueState, QString pauseReason = QString());
+	void setQueueState(QString queue, QueueState queueState, QString pauseReason = QString());
 	QueueState queueState() const;
 	QString pauseReason();
 
@@ -91,7 +92,7 @@ public:
     void startPause();
     void finishPause();
 
-	void sendResponse(User::Action action, QVariantMap fields);
+	void sendResponse(User::Action action, bool success, QVariantMap fields = QVariantMap());
 	void sendEvent(User::Event event, QVariantMap fields);
 	virtual void disconnect() {}
 
@@ -109,11 +110,12 @@ protected:
 
 private:
 	uint sessionId, pauseId;
-	QString username_, fullname_, peer_, queue_, pauseReason_;
+	QString username_, fullname_, peer_, pauseReason_;
 	Level level_;
 	QueueState queueState_;
 	PhoneState phoneState_;
 	QDateTime lastCall_;
+	QStringList queues_;
 
 	QTcpSocket *client_;
 	QByteArray messageBuffer;

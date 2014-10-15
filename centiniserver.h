@@ -30,13 +30,16 @@ private:
 	QTcpServer *tcpServer;
 	QWebSocketServer *webSocketServer;
 
-	QHash<QString, QString> actionIds; // Action, ActionID
+	QHash<QString, QString> actionIDs; // ActionID, Action
+	QHash<QString, User::Action> userActions; // ActionID, User Action
 
 	QHash<QString, QString> sipPeers; // IP Address, Peer
+	QHash<QString, QString> peerContexts; // Peer, Context
 
 	QHash<QString, QString> channels; // Channel, Peer
 	QHash<QString, int> channelStates; // Channel, Channel State
 	QHash<QString, QDateTime> channelLastCalls; // Channel, Last Call
+	QHash<QString, QString> channelLinks; // Channel, Channel
 
 	QStringList queues;
 	QHash<QString, QStringList> queueMembers; // Queue, Peers
@@ -44,12 +47,15 @@ private:
 	QHash<QString, QString> users; // IP Address, Username
 	QHash<QString, User *> agents, supervisors, managers;
 
-	void removeAction(QString action, QString actionId);
+	void addAction(QString action, QString actionID, User::Action userAction = User::Invalid);
+	void removeAction(QString action, QString actionID);
 
 	void addSipPeer(QVariantMap headers);
 
 	void addChannel(QVariantMap headers);
 	void removeChannel(QVariantMap headers);
+
+	void dispatchChannelLink(QVariantMap headers);
 
 	void addQueueMember(QVariantMap headers);
 	void pauseQueueMember(QVariantMap headers);
@@ -59,13 +65,16 @@ private:
 	User::PhoneState phoneStateOf(int channelState);
 	QString channelPeer(QString channel);
 	QDateTime durationLastCall(QString duration);
-	QString lookupQueue(QString peer);
+	QStringList lookupQueue(QString peer);
+	QString lookupCounterpart(QString channel);
 
 	void actionLogin(User *user, QString username, QString passwordHash);
 	void actionLogout(User *user);
-	void actionDial(QString peer, QString number);
-	void actionHangup(User *user, QString username);
-	void actionSpy(User *user, QString target);
+	void actionDial(User *user, QString number);
+	void actionHangup(User *user, QString target);
+	void actionTransfer(User *user, QString destination);
+	void actionSendDigit(User *user, QChar digit);
+	void actionSpy(User *user, QString target, bool whisper = false);
     void actionWhisper(User *user, QString target);
     void actionPause(User *user, bool paused, QString reason);
 

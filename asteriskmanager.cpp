@@ -436,9 +436,13 @@ QString AsteriskManager::actionPing()
 	return sendAction("Ping");
 }
 
-QString AsteriskManager::actionPlayDTMF()
+QString AsteriskManager::actionPlayDTMF(QString channel, QChar digit)
 {
-	return sendAction("PlayDTMF");
+	QVariantMap headers;
+	headers["Channel"] = channel;
+	headers["Digit"] = digit;
+
+	return sendAction("PlayDTMF", headers);
 }
 
 QString AsteriskManager::actionPresenceState()
@@ -541,9 +545,27 @@ QString AsteriskManager::actionQueueSummary()
 	return sendAction("QueueSummary");
 }
 
-QString AsteriskManager::actionRedirect()
+QString AsteriskManager::actionRedirect(QString channel,
+										QString exten,
+										QString context,
+										uint priority,
+										QString extraChannel,
+										QString extraExten,
+										QString extraContext,
+										uint extraPriority)
 {
-	return sendAction("Redirect");
+	QVariantMap headers;
+	headers["Channel"] = channel;
+	headers["Exten"] = exten;
+	headers["Context"] = context;
+	headers["Priority"] = priority;
+
+	insertNotEmpty(&headers, "ExtraChannel", extraChannel);
+	insertNotEmpty(&headers, "ExtraExten", extraExten);
+	insertNotEmpty(&headers, "ExtraContext", extraContext);
+	insertNotEmpty(&headers, "ExtraPriority", extraPriority);
+
+	return sendAction("Redirect", headers);
 }
 
 QString AsteriskManager::actionReload()
@@ -689,6 +711,7 @@ void AsteriskManager::insertNotEmpty(QVariantMap *headers, QString key, QVariant
 	case QMetaType::Char:
 		isEmpty = value.toChar() == -1;
 		break;
+	case QMetaType::Int:
 	case QMetaType::UInt:
 		isEmpty = value.toUInt() == 0;
 		break;

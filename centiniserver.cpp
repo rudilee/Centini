@@ -38,33 +38,58 @@ void CentiniServer::run()
 	qDebug("Listening incoming connection");
 }
 
-void CentiniServer::removeAction(QString action, QString actionId)
+void CentiniServer::addAction(QString action, QString actionID, User::Action userAction)
 {
-	if (actionId == actionIds.value(action))
-		actionIds.remove(action);
+	if (!actionID.isEmpty()) {
+		actionIDs[actionID] = action;
+
+		if (userAction != User::Invalid)
+			userActions[actionID] = userAction;
+	}
+}
+
+void CentiniServer::removeAction(QString action, QString actionID)
+{
+	if (actionID == actionIDs.key(action))
+		actionIDs.remove(actionIDs.key(action));
 }
 
 void CentiniServer::addSipPeer(QVariantMap headers)
 {
 	QRegExp addressPattern("^(.+):[0-9]{2,5}$");
 	QString ipAddress,
-			peer =  headers["Peer"].toString(),
-			peerStatus = headers["PeerStatus"].toString();
+			peer;
 
-	if (addressPattern.indexIn(headers["Address"].toString()) > -1)
-		ipAddress = addressPattern.cap(1);
+	bool registered = headers.contains("PeerStatus") ? headers["PeerStatus"].toString() == "Registered" : true;
+
+	if (headers.contains("IPaddress")) {
+		ipAddress = headers["IPaddress"].toString();
+	} else {
+		if (addressPattern.indexIn(headers["Address"].toString()) > -1)
+			ipAddress = addressPattern.cap(1);
+		else
+			ipAddress = sipPeers.key(peer);
+	}
+
+	if (headers.contains("Peer"))
+		peer = peer = headers["Peer"].toString();
 	else
-		ipAddress = sipPeers.key(peer);
+		peer = QString("%1/%2").arg(headers["Channeltype"].toString(), headers["ObjectName"].toString());
 
-	User *user = lookupUser(ipAddress);
+	if (!ipAddress.isEmpty() && !peer.isEmpty()) {
+		User *user = lookupUser(ipAddress);
 
-	if (user != NULL)
-		user->setPeer(peerStatus == "Registered" ? peer : QString());
+		if (user != NULL)
+			user->setPeer(registered ? peer : QString());
+	}
 
-	if (peerStatus == "Unregistered")
-		sipPeers.remove(ipAddress);
-	else
+	if (registered)
 		sipPeers[ipAddress] = peer;
+	else
+		sipPeers.remove(ipAddress);
+
+	if (!peer.isEmpty())
+		addAction(peer, asterisk->actionSIPshowpeer(QString(peer).remove("SIP/")));
 }
 
 void CentiniServer::addChannel(QVariantMap headers)
@@ -105,6 +130,19 @@ void CentiniServer::removeChannel(QVariantMap headers)
 	channelLastCalls.remove(channel);
 }
 
+void CentiniServer::dispatchChannelLink(QVariantMap headers)
+{
+	bool isLink = headers["Bridgestate"].toString() == "Link";
+
+	QString channel1 = headers["Channel1"].toString(),
+			channel2 = headers["Channel2"].toString();
+
+	if (isLink)
+		channelLinks[channel1] = channel2;
+	else
+		channelLinks.remove(channel1);
+}
+
 void CentiniServer::addQueueMember(QVariantMap headers)
 {
 	QString queue = headers["Queue"].toString(),
@@ -116,8 +154,8 @@ void CentiniServer::addQueueMember(QVariantMap headers)
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL) {
-			user->setQueue(queue);
-			user->setQueueState(User::Joined);
+			user->addQueue(queue);
+			user->setQueueState(queue, User::Joined);
 		}
 	}
 }
@@ -130,7 +168,7 @@ void CentiniServer::pauseQueueMember(QVariantMap headers)
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL)
-			user->setQueueState(headers["Paused"].toUInt() == 1 ? User::Paused : User::Joined, headers["Reason"].toString());
+			user->setQueueState(headers["Queue"].toString(), headers["Paused"].toUInt() == 1 ? User::Paused : User::Joined, headers["Reason"].toString());
 	}
 }
 
@@ -146,8 +184,8 @@ void CentiniServer::removeQueueMember(QVariantMap headers)
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL) {
-			user->setQueue(QString());
-			user->setQueueState(User::None);
+			user->removeQueue(queue);
+			user->setQueueState(queue, User::None);
 		}
 	}
 }
@@ -219,17 +257,29 @@ QDateTime CentiniServer::durationLastCall(QString duration)
 	return lastCall;
 }
 
-QString CentiniServer::lookupQueue(QString peer)
+QStringList CentiniServer::lookupQueue(QString peer)
 {
+	QStringList queues;
+
 	QHashIterator<QString, QStringList> members(queueMembers);
 	while (members.hasNext()) {
 		members.next();
 
 		if (members.value().contains(peer))
-			return members.key();
+			queues << members.key();
 	}
 
-	return QString();
+	return queues;
+}
+
+QString CentiniServer::lookupCounterpart(QString channel)
+{
+	QString counterpart = channelLinks.value(channel);
+
+	if (counterpart.isEmpty())
+		counterpart = channelLinks.key(channel);
+
+	return counterpart;
 }
 
 void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
@@ -248,8 +298,7 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 			message = "Successfuly logged in.";
 
 			QString peer = sipPeers.value(user->ipAddress()),
-					channel = channels.key(peer),
-					queue = lookupQueue(peer);
+					channel = channels.key(peer);
 
 			user->setUsername(username);
 			user->setFullname(query.value("fullname").toString());
@@ -258,9 +307,14 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 			user->setPeer(peer);
 			user->setPhoneState(phoneStateOf(channelStates.value(channel)));
 
-			if (!queue.isEmpty()) {
-				user->setQueue(queue);
-				user->setQueueState(User::Joined);
+			QStringList queues = lookupQueue(peer);
+
+			if (!queues.isEmpty()) {
+				user->setQueues(queues);
+
+				foreach (QString queue, queues) {
+					user->setQueueState(queue, User::Joined);
+				}
 			}
 
 			connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
@@ -293,10 +347,9 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 	}
 
 	QVariantMap response;
-	response["success"] = success;
 	response["message"] = message;
 
-	user->sendResponse(User::Login, response);
+	user->sendResponse(User::Login, success, response);
 }
 
 void CentiniServer::actionLogout(User *user)
@@ -307,36 +360,85 @@ void CentiniServer::actionLogout(User *user)
 	broadcastUserEvent(user, User::LoggedOut, fields);
 
 	QVariantMap response;
-	response["success"] = true;
 	response["message"] = "Bye!";
 
-	user->sendResponse(User::Logout, response);
+	user->sendResponse(User::Logout, true, response);
 	user->disconnect();
 }
 
-void CentiniServer::actionDial(QString peer, QString number)
+void CentiniServer::actionDial(User *user, QString number)
 {
-	asterisk->actionOriginate(peer, number);
+	QString peer = user->peer();
+
+	addAction(user->username(), asterisk->actionOriginate(peer, number, peerContexts.value(peer), 1, QString(), QString(), 0, number), User::Dial);
 }
 
-void CentiniServer::actionHangup(User *user, QString username)
+void CentiniServer::actionHangup(User *user, QString target)
 {
-	if (user->username() != username) {
-		if (user->level() != User::Agent)
-			;
+	QString username = user->username();
+	bool isSelf = username == target;
+
+	if (!isSelf ? (user->level() != User::Agent) : true) {
+		QString peer;
+
+		if (isSelf) {
+			peer = user->peer();
+		} else {
+			User *otherUser = lookupUser(users.key(target));
+
+			if (otherUser != NULL)
+				peer = otherUser->peer();
+		}
+
+		QStringList channels = this->channels.keys(peer);
+
+		if (!channels.isEmpty()) {
+			foreach (QString channel, channels) {
+				addAction(username, asterisk->actionHangup(channel), User::Hangup);
+			}
+		}
 	}
 }
 
-void CentiniServer::actionSpy(User *user, QString target)
+void CentiniServer::actionTransfer(User *user, QString destination)
 {
-	if (user->level() != User::Agent)
-		;
+	QString peer = user->peer(),
+			channel = lookupCounterpart(channels.key(peer)),
+			context = peerContexts.value(peer);
+
+	if (context.isEmpty())
+		context = settings->value("asterisk/outgoing_context", "outgoing").toString();
+
+	if (!channel.isEmpty())
+		addAction(user->username(), asterisk->actionRedirect(channel, destination, context, 1), User::Transfer);
+}
+
+void CentiniServer::actionSendDigit(User *user, QChar digit)
+{
+	QString channel = lookupCounterpart(channels.key(user->peer()));
+
+	if (!channel.isEmpty())
+		addAction(user->username(), asterisk->actionPlayDTMF(channel, digit), User::SendDigit);
+}
+
+void CentiniServer::actionSpy(User *user, QString target, bool whisper)
+{
+	QString username = user->username();
+
+	if (username != target && user->level() != User::Agent) {
+		QString peer = user->peer(),
+				context = peerContexts.value(peer),
+				targetPeer = sipPeers.value(users.key(target)),
+				data = QString(whisper ? ",w" : "").prepend(targetPeer);
+
+		if (!targetPeer.isEmpty())
+			addAction(username, asterisk->actionOriginate(peer, QString(), context, 0, "ExtenSpy", data, 0, whisper ? "Whisper" : "Spy"), User::Spy);
+	}
 }
 
 void CentiniServer::actionWhisper(User *user, QString target)
 {
-	if (user->level() != User::Agent)
-		;
+	actionSpy(user, target, true);
 }
 
 void CentiniServer::actionPause(User *user, bool paused, QString reason)
@@ -446,8 +548,10 @@ void CentiniServer::openDatabaseConnection()
 
 void CentiniServer::onAsteriskConnected(QString version)
 {
-	actionIds["Login"] = asterisk->actionLogin(settings->value("asterisk/username", "monitor").toString(),
-											   settings->value("asterisk/secret", "m0n1t0r").toString());
+	QString actionID = asterisk->actionLogin(settings->value("asterisk/username", "monitor").toString(),
+											 settings->value("asterisk/secret", "m0n1t0r").toString());
+
+	addAction("Login", actionID);
 
 	qDebug() << "Login to Asterisk server, AMI version:" << version;
 }
@@ -463,15 +567,40 @@ void CentiniServer::onAsteriskDisconnected()
 
 void CentiniServer::onAsteriskResponseSent(AsteriskManager::Response response, QVariantMap headers, QString actionID)
 {
-	if (actionID == actionIds.take("Login")) {
+	if (actionID == actionIDs.take("Login")) {
 		switch (response) {
 		case AsteriskManager::Success:
 			qDebug("Asterisk server connected");
+
 			break;
 		case AsteriskManager::Error:
 		default:
 			qDebug() << "Asterisk connection failed, message:" << headers["Message"].toString();
+
 			break;
+		}
+	} else if (headers.contains("Context")) {
+		QString peer = actionIDs.value(actionID);
+
+		if (!peer.isEmpty()) {
+			peerContexts[peer] = headers["Context"].toString();
+
+			actionIDs.remove(peer);
+		}
+	} else if (userActions.contains(actionID)) {
+		QString username = actionIDs.value(actionID);
+
+		if (!username.isEmpty()) {
+			User *user = lookupUser(users.key(username));
+
+			if (user != NULL) {
+				bool success = headers["Response"].toString() == "Success";
+
+				QVariantMap fields;
+				fields["message"] = headers["Message"].toString();
+
+				user->sendResponse(userActions.value(actionID), success, fields);
+			}
 		}
 	}
 }
@@ -482,14 +611,14 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 	switch (event) {
 	case AsteriskManager::FullyBooted:
-		actionIds["SIPpeers"] = asterisk->actionSIPpeers();
-		actionIds["CoreShowChannels"] = asterisk->actionCoreShowChannels();
-		actionIds["QueueStatus"] = asterisk->actionQueueStatus();
+		addAction("SIPpeers", asterisk->actionSIPpeers());
+		addAction("CoreShowChannels", asterisk->actionCoreShowChannels());
+		addAction("QueueStatus", asterisk->actionQueueStatus());
 
 		break;
 	case AsteriskManager::PeerEntry:
-		if (actionId == actionIds.value("SIPpeers"))
-			sipPeers[headers["IPaddress"].toString()] = QString("%1/%2").arg(headers["Channeltype"].toString(), headers["ObjectName"].toString());
+		if (actionId == actionIDs.key("SIPpeers"))
+			addSipPeer(headers);
 
 		break;
 	case AsteriskManager::PeerlistComplete:
@@ -501,7 +630,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::CoreShowChannel:
-		if (actionId == actionIds.value("CoreShowChannels"))
+		if (actionId == actionIDs.key("CoreShowChannels"))
 			addChannel(headers);
 
 		break;
@@ -521,7 +650,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::QueueParams:
-		if (actionId == actionIds.value("QueueStatus")) {
+		if (actionId == actionIDs.key("QueueStatus")) {
 			QString queue = headers["queue"].toString();
 
 			if (!queue.isEmpty())
@@ -530,7 +659,7 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::QueueMember:
-		if (actionId == actionIds.value("QueueStatus"))
+		if (actionId == actionIDs.key("QueueStatus"))
 			addQueueMember(headers);
 
 		break;
@@ -551,10 +680,33 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::QueueMemberStatus:
+		//Event: QueueMemberStatus
+		//Privilege: agent,all
+		//Queue: call_center
+		//Location: SIP/1003
+		//MemberName: SIP/1003
+		//StateInterface: SIP/1003
+		//Membership: static
+		//Penalty: 0
+		//CallsTaken: 13
+		//LastCall: 1413204078
+		//Status: 1
+		//Paused: 0
+
 		break;
+	case AsteriskManager::QueueEntry:
+		qDebug() << "Action:" << actionIDs.value(headers["ActionID"].toString());
+
+		break;
+	case AsteriskManager::Bridge:
+		dispatchChannelLink(headers);
+
+		break;
+	case AsteriskManager::DAHDIChannel:
 	case AsteriskManager::Dial:
 	case AsteriskManager::RTCPReceived:
 	case AsteriskManager::RTCPSent:
+	case AsteriskManager::NewAccountCode:
 	case AsteriskManager::Newexten:
 	case AsteriskManager::NewCallerid:
 	case AsteriskManager::VarSet:
@@ -617,10 +769,9 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 	if (action != User::Login) {
 		if (user->username().isEmpty()) {
 			QVariantMap response;
-			response["success"] = false;
 			response["message"] = "Unauthorized access.";
 
-			user->sendResponse(User::Invalid, response);
+			user->sendResponse(User::Invalid, false, response);
 
 			return;
 		}
@@ -636,11 +787,19 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 
 		break;
 	case User::Dial:
-		actionDial(user->peer(), fields.contains("username") ? fields["username"].toString() : fields["number"].toString());
+		actionDial(user, fields.contains("username") ? fields["username"].toString() : fields["number"].toString());
 
 		break;
 	case User::Hangup:
 		actionHangup(user, fields.contains("username") ? fields["username"].toString() : user->username());
+
+		break;
+	case User::Transfer:
+		actionTransfer(user, fields["destination"].toString());
+
+		break;
+	case User::SendDigit:
+		actionSendDigit(user, fields["digit"].toChar());
 
 		break;
 	case User::Spy:
@@ -652,15 +811,14 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 
         break;
     case User::Pause:
-        actionPause(user->peer(), user->queue(), fields["paused"].toBool(), fields["pause_reason"].toString());
+		actionPause(user, fields["paused"].toBool(), fields["pause_reason"].toString());
 
         break;
 	default:
 		QVariantMap response;
-		response["success"] = false;
 		response["message"] = "Invalid action command.";
 
-		user->sendResponse(action, response);
+		user->sendResponse(action, false, response);
 
 		break;
 	}

@@ -71,33 +71,35 @@ QString User::peer()
 	return peer_;
 }
 
-void User::setQueue(QString queue)
+void User::addQueue(QString queue)
 {
-	queue_ = queue;
-
-	QVariantMap fields;
-	fields["queue"] = queue;
-
-	sendEvent(User::QueueChanged, fields);
+	if (!queues_.contains(queue))
+		queues_ << queue;
 }
 
-QString User::queue()
+void User::removeQueue(QString queue)
 {
-    return queue_;
+	queues_.removeAll(queue);
+}
+
+void User::setQueues(QStringList queues)
+{
+	queues_ = queues;
 }
 
 QStringList User::queues()
 {
-    return QStringList();
+	return queues_;
 }
 
-void User::setQueueState(User::QueueState queueState, QString pauseReason)
+void User::setQueueState(QString queue, User::QueueState queueState, QString pauseReason)
 {
 	queueState_ = queueState;
 	pauseReason_ = pauseReason;
 
 	QVariantMap fields;
 	fields["username"] = username_;
+	fields["queue"] = queue;
 	fields["queue_state"] = queueStateText(queueState);
 
 	sendEvent(User::QueueStateChanged, fields);
@@ -171,10 +173,11 @@ void User::finishPause()
         qDebug() << "Pause finish query error:" << query.lastError().text();
 }
 
-void User::sendResponse(User::Action action, QVariantMap fields)
+void User::sendResponse(User::Action action, bool success, QVariantMap fields)
 {
 	fields["type"] = "Response";
 	fields["response"] = enumText("Action", action);
+	fields["success"] = success;
 
 	sendMessage(fields);
 }
