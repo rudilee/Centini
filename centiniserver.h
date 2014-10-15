@@ -43,6 +43,7 @@ private:
 
 	QStringList queues;
 	QHash<QString, QStringList> queueMembers; // Queue, Peers
+	QHash<QString, QHash<QString, User::QueueState> > queueMemberStates; // Queue, (Peer, Queue State)
 
 	QHash<QString, QString> users; // IP Address, Username
 	QHash<QString, User *> agents, supervisors, managers;
@@ -57,6 +58,7 @@ private:
 
 	void dispatchChannelLink(QVariantMap headers);
 
+	void addQueue(QString queue);
 	void addQueueMember(QVariantMap headers);
 	void pauseQueueMember(QVariantMap headers);
 	void removeQueueMember(QVariantMap headers);

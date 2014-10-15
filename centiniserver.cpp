@@ -143,19 +143,39 @@ void CentiniServer::dispatchChannelLink(QVariantMap headers)
 		channelLinks.remove(channel1);
 }
 
+void CentiniServer::addQueue(QString queue)
+{
+	if (!queue.isEmpty()) {
+		queues << queue;
+
+		if (!queueMemberStates.contains(queue))
+			queueMemberStates[queue] = QHash<QString, User::QueueState>();
+	}
+}
+
 void CentiniServer::addQueueMember(QVariantMap headers)
 {
 	QString queue = headers["Queue"].toString(),
 			location = headers["Location"].toString();
 
 	if (!location.isEmpty()) {
-		queueMembers[queue] << location;
+		if (!queueMembers[queue].contains(location))
+			queueMembers[queue] << location;
+
+		User::QueueState queueState = User::Joined;
+
+		if (headers.contains("Paused")) {
+			if (headers["Paused"].toUInt() == 1)
+				queueState = User::Paused;
+		}
+
+		queueMemberStates[queue][location] = queueState;
 
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL) {
 			user->addQueue(queue);
-			user->setQueueState(queue, User::Joined);
+			user->setQueueState(queue, queueState);
 		}
 	}
 }
@@ -165,10 +185,15 @@ void CentiniServer::pauseQueueMember(QVariantMap headers)
 	QString location = headers["Location"].toString();
 
 	if (!location.isEmpty()) {
+		QString queue = headers["Queue"].toString();
+		User::QueueState queueState = headers["Paused"].toUInt() == 1 ? User::Paused : User::Joined;
+
+		queueMemberStates[queue][location] = queueState;
+
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL)
-			user->setQueueState(headers["Queue"].toString(), headers["Paused"].toUInt() == 1 ? User::Paused : User::Joined, headers["Reason"].toString());
+			user->setQueueState(queue, queueState);
 	}
 }
 
@@ -180,6 +205,8 @@ void CentiniServer::removeQueueMember(QVariantMap headers)
 	if (!location.isEmpty()) {
 		if (queueMembers.contains(queue))
 			queueMembers[queue].removeAll(location);
+
+		queueMemberStates[queue][location] = User::None;
 
 		User *user = lookupUser(sipPeers.key(location));
 
@@ -313,7 +340,7 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 				user->setQueues(queues);
 
 				foreach (QString queue, queues) {
-					user->setQueueState(queue, User::Joined);
+					user->setQueueState(queue, queueMemberStates[queue].value(peer));
 				}
 			}
 
@@ -448,6 +475,8 @@ void CentiniServer::actionPause(User *user, bool paused, QString reason)
     foreach (QString queue, user->queues()) {
         asterisk->actionQueuePause(peer, paused, queue, reason);
     }
+
+	user->setPauseReason(reason);
 
     if (paused)
         user->startPause();
@@ -650,15 +679,13 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	case AsteriskManager::QueueParams:
-		if (actionId == actionIDs.key("QueueStatus")) {
-			QString queue = headers["queue"].toString();
-
-			if (!queue.isEmpty())
-				queues << queue;
-		}
+	case AsteriskManager::QueueEntry:
+		if (actionId == actionIDs.key("QueueStatus"))
+			addQueue(headers["queue"].toString());
 
 		break;
 	case AsteriskManager::QueueMember:
+	case AsteriskManager::QueueMemberStatus:
 		if (actionId == actionIDs.key("QueueStatus"))
 			addQueueMember(headers);
 
@@ -677,25 +704,6 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 		break;
 	case AsteriskManager::QueueMemberRemoved:
 		removeQueueMember(headers);
-
-		break;
-	case AsteriskManager::QueueMemberStatus:
-		//Event: QueueMemberStatus
-		//Privilege: agent,all
-		//Queue: call_center
-		//Location: SIP/1003
-		//MemberName: SIP/1003
-		//StateInterface: SIP/1003
-		//Membership: static
-		//Penalty: 0
-		//CallsTaken: 13
-		//LastCall: 1413204078
-		//Status: 1
-		//Paused: 0
-
-		break;
-	case AsteriskManager::QueueEntry:
-		qDebug() << "Action:" << actionIDs.value(headers["ActionID"].toString());
 
 		break;
 	case AsteriskManager::Bridge:
@@ -811,7 +819,7 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 
         break;
     case User::Pause:
-		actionPause(user, fields["paused"].toBool(), fields["pause_reason"].toString());
+		actionPause(user, fields["paused"].toBool(), fields["reason"].toString());
 
         break;
 	default:

@@ -92,10 +92,9 @@ QStringList User::queues()
 	return queues_;
 }
 
-void User::setQueueState(QString queue, User::QueueState queueState, QString pauseReason)
+void User::setQueueState(QString queue, User::QueueState queueState)
 {
 	queueState_ = queueState;
-	pauseReason_ = pauseReason;
 
 	QVariantMap fields;
 	fields["username"] = username_;
@@ -110,6 +109,11 @@ void User::setQueueState(QString queue, User::QueueState queueState, QString pau
 User::QueueState User::queueState() const
 {
 	return queueState_;
+}
+
+void User::setPauseReason(QString pauseReason)
+{
+	pauseReason_ = pauseReason;
 }
 
 QString User::pauseReason()
@@ -154,9 +158,11 @@ void User::startPause()
     query.prepare("INSERT INTO user_pause_log (username, start, reason) VALUES (:username, :start, :reason)");
     query.bindValue(":username", username_);
     query.bindValue(":start", QDateTime::currentDateTime());
-    query.bindValue(":reason", pauseReason_);
+	query.bindValue(":reason", pauseReason_);
 
-    if (!query.exec())
+	if (query.exec())
+		pauseId = query.lastInsertId().toUInt();
+	else
         qDebug() << "Pause start query error:" << query.lastError().text();
 }
 

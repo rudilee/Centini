@@ -77,8 +77,10 @@ public:
 	void setQueues(QStringList queues);
     QStringList queues();
 
-	void setQueueState(QString queue, QueueState queueState, QString pauseReason = QString());
+	void setQueueState(QString queue, QueueState queueState);
 	QueueState queueState() const;
+
+	void setPauseReason(QString pauseReason);
 	QString pauseReason();
 
 	void setPhoneState(PhoneState phoneState);
@@ -89,7 +91,7 @@ public:
 
 	virtual QString ipAddress() { return QString(); }
 
-    void startPause();
+	void startPause();
     void finishPause();
 
 	void sendResponse(User::Action action, bool success, QVariantMap fields = QVariantMap());
