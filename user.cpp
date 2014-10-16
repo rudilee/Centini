@@ -25,6 +25,7 @@ void User::setUsername(QString username)
 	if (!username.isEmpty()) {
 		killTimer(timerId);
 
+		populateGroups();
 		startSession();
 	}
 }
@@ -52,6 +53,11 @@ void User::setLevel(User::Level level)
 User::Level User::level() const
 {
 	return level_;
+}
+
+QStringList User::groups()
+{
+	return groups_;
 }
 
 void User::setPeer(QString peer)
@@ -163,7 +169,7 @@ void User::startPause()
 	if (query.exec())
 		pauseId = query.lastInsertId().toUInt();
 	else
-        qDebug() << "Pause start query error:" << query.lastError().text();
+		qCritical() << "Pause start query error:" << query.lastError().text();
 }
 
 void User::finishPause()
@@ -176,7 +182,7 @@ void User::finishPause()
     pauseId = 0;
 
     if (!query.exec())
-        qDebug() << "Pause finish query error:" << query.lastError().text();
+		qCritical() << "Pause finish query error:" << query.lastError().text();
 }
 
 void User::sendResponse(User::Action action, bool success, QVariantMap fields)
@@ -250,7 +256,7 @@ void User::startSession()
 	if (query.exec())
 		sessionId = query.lastInsertId().toUInt();
 	else
-		qDebug() << "Session start query error:" << query.lastError().text();
+		qCritical() << "Session start query error:" << query.lastError().text();
 }
 
 void User::finishSession()
@@ -261,5 +267,25 @@ void User::finishSession()
 	query.bindValue(":id", sessionId);
 
 	if (!query.exec())
-		qDebug() << "Session finish query error:" << query.lastError().text();
+		qCritical() << "Session finish query error:" << query.lastError().text();
+}
+
+void User::populateGroups()
+{
+	QSqlQuery query;
+	query.prepare("SELECT `group` FROM user_group WHERE username = :username");
+	query.bindValue(":username", username_);
+
+	if (query.exec()) {
+		groups_.clear();
+
+		while (query.next()) {
+			QString group = query.value("group").toString();
+
+			if (!group.isEmpty())
+				groups_ << group;
+		}
+	} else {
+		qCritical() << "Populate Group query error:" << query.lastError().text();
+	}
 }

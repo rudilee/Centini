@@ -45,7 +45,7 @@ public:
 		Hangup,
 		Transfer,
 		SendDigit,
-		Spy,
+		Listen,
 		Whisper,
 		Barge,
 		Pause,
@@ -68,6 +68,8 @@ public:
 
 	void setLevel(Level level);
 	Level level() const;
+
+	QStringList groups();
 
 	void setPeer(QString peer);
 	QString peer();
@@ -114,6 +116,7 @@ private:
 	uint sessionId, pauseId;
 	QString username_, fullname_, peer_, pauseReason_;
 	Level level_;
+	QStringList groups_;
 	QueueState queueState_;
 	PhoneState phoneState_;
 	QDateTime lastCall_;
@@ -127,6 +130,8 @@ private:
 
 	void startSession();
 	void finishSession();
+
+	void populateGroups();
 
 	virtual void sendMessage(QVariantMap fields) { Q_UNUSED(fields) }
 

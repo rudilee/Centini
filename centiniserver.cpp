@@ -309,68 +309,89 @@ QString CentiniServer::lookupCounterpart(QString channel)
 	return counterpart;
 }
 
+bool CentiniServer::groupPermited(User *sender, User *receiver)
+{
+	// Pastiin kalo Pengirim sama Penerima User yg beda [1],
+	// terus Pengirim ada di Group yg sama dg Penerima [2],
+	// atau Penerima punya Level Manager [3]
+
+	return /*1*/(sender != receiver) && (/*2*/!receiver->groups().toSet().intersect(sender->groups().toSet()).isEmpty() || /*3*/receiver->level() == User::Manager);
+}
+
 void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
 {
-	QSqlQuery query;
-	query.prepare("SELECT * FROM user WHERE password = :password");
-	query.bindValue(":password", passwordHash);
-
-	QString message = "Login failed.";
-	bool success = query.exec();
+	QString message = "Login failed, Username or IP Address already used.";
+	bool success = !users.values().contains(username) && !users.contains(user->ipAddress());
 
 	if (success) {
-		success = query.next();
+		QSqlQuery query;
+		query.prepare("SELECT * FROM users WHERE username = :username AND password = :password");
+		query.bindValue(":username", username);
+		query.bindValue(":password", passwordHash);
+
+		success = query.exec();
 
 		if (success) {
-			message = "Successfuly logged in.";
+			success = query.next();
 
-			QString peer = sipPeers.value(user->ipAddress()),
-					channel = channels.key(peer);
+			if (success) {
+				message = "Successfuly logged in.";
 
-			user->setUsername(username);
-			user->setFullname(query.value("fullname").toString());
-			user->setLevel((User::Level) user->levelIndex(query.value("level").toString()));
-			user->setLastCall(channelLastCalls.value(channel));
-			user->setPeer(peer);
-			user->setPhoneState(phoneStateOf(channelStates.value(channel)));
+				QString peer = sipPeers.value(user->ipAddress()),
+						channel = channels.key(peer);
 
-			QStringList queues = lookupQueue(peer);
+				user->setUsername(username);
+				user->setFullname(query.value("fullname").toString());
+				user->setLevel((User::Level) user->levelIndex(query.value("level").toString()));
+				user->setLastCall(channelLastCalls.value(channel));
+				user->setPeer(peer);
+				user->setPhoneState(phoneStateOf(channelStates.value(channel)));
 
-			if (!queues.isEmpty()) {
-				user->setQueues(queues);
+				QStringList queues = lookupQueue(peer);
 
-				foreach (QString queue, queues) {
-					user->setQueueState(queue, queueMemberStates[queue].value(peer));
+				if (!queues.isEmpty()) {
+					user->setQueues(queues);
+
+					foreach (QString queue, queues) {
+						user->setQueueState(queue, queueMemberStates[queue].value(peer));
+					}
+				}
+
+				connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
+				connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
+				connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
+
+				users[user->ipAddress()] = username;
+
+				switch (user->level()) {
+				case User::Manager:
+					managers[username] = user;
+
+					enumerateUserList(user, &supervisors);
+					enumerateUserList(user, &agents);
+
+					break;
+				case User::Supervisor:
+					supervisors[username] = user;
+
+					enumerateUserList(user, &agents);
+					broadcastUserEvent(user, &managers, User::LoggedIn, populateUserInfo(user));
+
+					break;
+				default:
+					agents[username] = user;
+
+					broadcastUserEvent(user, &managers, User::LoggedIn, populateUserInfo(user));
+					broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
+
+					break;
 				}
 			}
+		} else {
+			message = "Login failed due to system error.";
 
-			connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
-			connect(user, SIGNAL(phoneStateChanged(User::PhoneState)), SLOT(onUserPhoneStateChanged(User::PhoneState)));
-			connect(user, SIGNAL(queueStateChanged(User::QueueState)), SLOT(onUserQueueStateChanged(User::QueueState)));
-
-			users[user->ipAddress()] = username;
-
-			switch (user->level()) {
-			case User::Manager:
-				managers[username] = user;
-
-				enumerateUserList(user, &supervisors);
-				enumerateUserList(user, &agents);
-				break;
-			case User::Supervisor:
-				supervisors[username] = user;
-
-				enumerateUserList(user, &agents);
-				break;
-			default:
-				agents[username] = user;
-
-				broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
-				break;
-			}
+			qCritical() << "Login query failed, error:" << query.lastError().text();
 		}
-	} else {
-		qDebug() << "Login query failed, error:" << query.lastError().text();
 	}
 
 	QVariantMap response;
@@ -448,7 +469,7 @@ void CentiniServer::actionSendDigit(User *user, QChar digit)
 		addAction(user->username(), asterisk->actionPlayDTMF(channel, digit), User::SendDigit);
 }
 
-void CentiniServer::actionSpy(User *user, QString target, bool whisper)
+void CentiniServer::actionListen(User *user, QString target, QChar option, QString callerId)
 {
 	QString username = user->username();
 
@@ -456,16 +477,21 @@ void CentiniServer::actionSpy(User *user, QString target, bool whisper)
 		QString peer = user->peer(),
 				context = peerContexts.value(peer),
 				targetPeer = sipPeers.value(users.key(target)),
-				data = QString(whisper ? ",w" : "").prepend(targetPeer);
+				data = QString(",q%1").arg(option).prepend(targetPeer);
 
 		if (!targetPeer.isEmpty())
-			addAction(username, asterisk->actionOriginate(peer, QString(), context, 0, "ExtenSpy", data, 0, whisper ? "Whisper" : "Spy"), User::Spy);
+			addAction(username, asterisk->actionOriginate(peer, QString(), context, 0, "ExtenSpy", data, 0, callerId), User::Listen);
 	}
 }
 
 void CentiniServer::actionWhisper(User *user, QString target)
 {
-	actionSpy(user, target, true);
+	actionListen(user, target, 'w', "Whisper");
+}
+
+void CentiniServer::actionBarge(User *user, QString target)
+{
+	actionListen(user, target, 'B', "Barge");
 }
 
 void CentiniServer::actionPause(User *user, bool paused, QString reason)
@@ -490,6 +516,7 @@ QVariantMap CentiniServer::populateUserInfo(User *user)
 	fields["username"] = user->username();
 	fields["fullname"] = user->fullname();
 	fields["level"] = user->levelText();
+	fields["groups"] = user->groups();
 	fields["peer"] = user->peer();
 	fields["phone_state"] = user->phoneStateText();
 	fields["queue_state"] = user->queueStateText();
@@ -502,11 +529,22 @@ QVariantMap CentiniServer::populateUserInfo(User *user)
 	return fields;
 }
 
+void CentiniServer::enumerateUserList(User *receiver, QHash<QString, User *> *senders)
+{
+	foreach (QString username, senders->keys()) {
+		User *sender = senders->value(username);
+
+		if (groupPermited(sender, receiver))
+			receiver->sendEvent(User::LoggedIn, populateUserInfo(sender));
+	}
+}
+
 void CentiniServer::broadcastUserEvent(User *sender, QHash<QString, User *> *receivers, User::Event event, QVariantMap fields)
 {
 	foreach (QString username, receivers->keys()) {
 		User *receiver = receivers->value(username);
-		if (receiver != sender)
+
+		if (groupPermited(sender, receiver))
 			receiver->sendEvent(event, fields);
 	}
 }
@@ -519,16 +557,6 @@ void CentiniServer::broadcastUserEvent(User *sender, User::Event event, QVariant
 	case User::Supervisor:
 		broadcastUserEvent(sender, &managers, event, fields);
 		break;
-	}
-}
-
-void CentiniServer::enumerateUserList(User *receiver, QHash<QString, User *> *senders)
-{
-	foreach (QString username, senders->keys()) {
-		User *sender = senders->value(username);
-		if (sender != receiver) {
-			receiver->sendEvent(User::LoggedIn, populateUserInfo(sender));
-		}
 	}
 }
 
@@ -604,7 +632,7 @@ void CentiniServer::onAsteriskResponseSent(AsteriskManager::Response response, Q
 			break;
 		case AsteriskManager::Error:
 		default:
-			qDebug() << "Asterisk connection failed, message:" << headers["Message"].toString();
+			qCritical() << "Asterisk connection failed, message:" << headers["Message"].toString();
 
 			break;
 		}
@@ -720,17 +748,19 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 	case AsteriskManager::VarSet:
 		break;
 	default:
-		qDebug() << "==< Event:" << asterisk->eventValue(event);
+		if (false) {
+			qDebug() << "==< Event:" << asterisk->eventValue(event);
 
-		QMapIterator<QString, QVariant> header(headers);
+			QMapIterator<QString, QVariant> header(headers);
 
-		while (header.hasNext()) {
-			header.next();
+			while (header.hasNext()) {
+				header.next();
 
-			qDebug() << header.key() << header.value();
+				qDebug() << header.key() << header.value();
+			}
+
+			qDebug("==>");
 		}
-
-		qDebug("==>");
 
 		break;
 	}
@@ -810,14 +840,18 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 		actionSendDigit(user, fields["digit"].toChar());
 
 		break;
-	case User::Spy:
-		actionSpy(user, fields["username"].toString());
+	case User::Listen:
+		actionListen(user, fields["username"].toString());
 
 		break;
 	case User::Whisper:
 		actionWhisper(user, fields["username"].toString());
 
         break;
+	case User::Barge:
+		actionBarge(user, fields["username"].toString());
+
+		break;
     case User::Pause:
 		actionPause(user, fields["paused"].toBool(), fields["reason"].toString());
 

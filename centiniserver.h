@@ -69,6 +69,7 @@ private:
 	QDateTime durationLastCall(QString duration);
 	QStringList lookupQueue(QString peer);
 	QString lookupCounterpart(QString channel);
+	bool groupPermited(User *sender, User *receiver);
 
 	void actionLogin(User *user, QString username, QString passwordHash);
 	void actionLogout(User *user);
@@ -76,15 +77,16 @@ private:
 	void actionHangup(User *user, QString target);
 	void actionTransfer(User *user, QString destination);
 	void actionSendDigit(User *user, QChar digit);
-	void actionSpy(User *user, QString target, bool whisper = false);
+	void actionListen(User *user, QString target, QChar option = QChar(), QString callerId = "Listen");
     void actionWhisper(User *user, QString target);
+	void actionBarge(User *user, QString target);
     void actionPause(User *user, bool paused, QString reason);
 
 	QVariantMap populateUserInfo(User *user);
 
+	void enumerateUserList(User *receiver, QHash<QString, User *> *senders);
 	void broadcastUserEvent(User *sender, QHash<QString, User *> *receivers, User::Event event, QVariantMap fields);
 	void broadcastUserEvent(User *sender, User::Event event, QVariantMap fields);
-	void enumerateUserList(User *receiver, QHash<QString, User *> *senders);
 
 private slots:
 	void openDatabaseConnection();
