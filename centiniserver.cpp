@@ -477,7 +477,7 @@ void CentiniServer::actionListen(User *user, QString target, QChar option, QStri
 		QString peer = user->peer(),
 				context = peerContexts.value(peer),
 				targetPeer = sipPeers.value(users.key(target)),
-				data = QString(",q%1").arg(option).prepend(targetPeer);
+				data = QString(",Eq%1").arg(option).prepend(targetPeer);
 
 		if (!targetPeer.isEmpty())
 			addAction(username, asterisk->actionOriginate(peer, QString(), context, 0, "ExtenSpy", data, 0, callerId), User::Listen);
