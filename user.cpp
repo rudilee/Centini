@@ -191,7 +191,16 @@ void User::sendResponse(User::Action action, bool success, QVariantMap fields)
 	fields["response"] = enumText("Action", action);
 	fields["success"] = success;
 
-	sendMessage(fields);
+    sendMessage(fields);
+}
+
+void User::sendResponse(User::Request request, bool success, QVariantMap fields)
+{
+    fields["type"] = "Response";
+    fields["request"] = enumText("Request", request);
+    fields["success"] = success;
+
+    sendMessage(fields);
 }
 
 void User::sendEvent(User::Event event, QVariantMap fields)
@@ -224,7 +233,12 @@ int User::levelIndex(QString text)
 
 int User::actionIndex(QString text)
 {
-	return enumIndex("Action", text);
+    return enumIndex("Action", text);
+}
+
+int User::requestIndex(QString text)
+{
+    return enumIndex("Request", text);
 }
 
 void User::timerEvent(QTimerEvent *event)

@@ -13,6 +13,7 @@ class User : public QObject
 	Q_ENUMS(QueueState)
 	Q_ENUMS(PhoneState)
 	Q_ENUMS(Action)
+    Q_ENUMS(Request)
 	Q_ENUMS(Event)
 
 public:
@@ -38,7 +39,7 @@ public:
 	};
 
 	enum Action {
-		Invalid = -1,
+        InvalidAction = -1,
 		Login,
 		Logout,
 		Dial,
@@ -50,6 +51,11 @@ public:
 		Barge,
 		Pause,
 	};
+
+    enum Request {
+        InvalidRequest = -1,
+        Status
+    };
 
 	enum Event {
 		ActionReady,
@@ -97,6 +103,7 @@ public:
     void finishPause();
 
 	void sendResponse(User::Action action, bool success, QVariantMap fields = QVariantMap());
+    void sendResponse(User::Request request, bool success, QVariantMap fields = QVariantMap());
 	void sendEvent(User::Event event, QVariantMap fields);
 	virtual void disconnect() {}
 
@@ -106,6 +113,7 @@ public:
 
 	int levelIndex(QString text);
 	int actionIndex(QString text);
+    int requestIndex(QString text);
 
 protected:
 	int timerId;
@@ -140,6 +148,7 @@ signals:
 	void disconnected();
 	void error(QString message);
 	void actionReceived(User::Action action, QVariantMap fields);
+    void requestReceived(User::Request request, QVariantMap fields);
 	void queueStateChanged(User::QueueState queueState);
 	void phoneStateChanged(User::PhoneState phoneState);
 	void peerChanged(QString peer);

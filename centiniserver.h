@@ -17,7 +17,7 @@ class CentiniServer : public QObject
 public:
 	explicit CentiniServer(QObject *parent = 0);
 
-	void run();
+    void run();
 
 private:
 	enum Query {
@@ -28,7 +28,7 @@ private:
 	QSqlDatabase database;
 	AsteriskManager *asterisk;
 	QTcpServer *tcpServer;
-	QWebSocketServer *webSocketServer;
+    QWebSocketServer *webSocketServer;
 
 	QHash<QString, QString> actionIDs; // ActionID, Action
 	QHash<QString, User::Action> userActions; // ActionID, User Action
@@ -48,7 +48,7 @@ private:
 	QHash<QString, QString> users; // IP Address, Username
 	QHash<QString, User *> agents, supervisors, managers;
 
-	void addAction(QString action, QString actionID, User::Action userAction = User::Invalid);
+	void addAction(QString action, QString actionID, User::Action userAction = User::InvalidAction);
 	void removeAction(QString action, QString actionID);
 
 	void addSipPeer(QVariantMap headers);
@@ -62,6 +62,8 @@ private:
 	void addQueueMember(QVariantMap headers);
 	void pauseQueueMember(QVariantMap headers);
 	void removeQueueMember(QVariantMap headers);
+
+    bool invalidResponse(User *user, bool isRequest = false);
 
 	User *lookupUser(QString ipAddress);
 	User::PhoneState phoneStateOf(int channelState);
@@ -82,6 +84,8 @@ private:
 	void actionBarge(User *user, QString target);
     void actionPause(User *user, bool paused, QString reason);
 
+    void requestStatus(User *user);
+
 	QVariantMap populateUserInfo(User *user);
 
 	void enumerateUserList(User *receiver, QHash<QString, User *> *senders);
@@ -101,6 +105,7 @@ private slots:
 	void onWebSocketServerNewConnection();
 
 	void onUserActionReceived(User::Action action, QVariantMap fields);
+    void onUserRequestReceived(User::Request request, QVariantMap fields);
 	void onUserDisconnected();
 	void onUserPeerChanged(QString peer);
 	void onUserPhoneStateChanged(User::PhoneState phoneStateOf);

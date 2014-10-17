@@ -33,9 +33,9 @@ void CentiniServer::run()
 	connectToAsterisk();
 
 	tcpServer->listen(QHostAddress::Any, settings->value("centini/port", 31415).toUInt());
-	webSocketServer->listen(QHostAddress::Any, settings->value("centini/ws_port", 8080).toUInt());
+    webSocketServer->listen(QHostAddress::Any, settings->value("centini/ws_port", 8080).toUInt());
 
-	qDebug("Listening incoming connection");
+    qDebug("Listening incoming connection");
 }
 
 void CentiniServer::addAction(QString action, QString actionID, User::Action userAction)
@@ -43,7 +43,7 @@ void CentiniServer::addAction(QString action, QString actionID, User::Action use
 	if (!actionID.isEmpty()) {
 		actionIDs[actionID] = action;
 
-		if (userAction != User::Invalid)
+        if (userAction != User::InvalidAction)
 			userActions[actionID] = userAction;
 	}
 }
@@ -214,7 +214,24 @@ void CentiniServer::removeQueueMember(QVariantMap headers)
 			user->removeQueue(queue);
 			user->setQueueState(queue, User::None);
 		}
-	}
+    }
+}
+
+bool CentiniServer::invalidResponse(User *user, bool isRequest)
+{
+    if (user->username().isEmpty()) {
+        QVariantMap response;
+        response["message"] = "Unauthorized access or invalid command.";
+
+        if (isRequest)
+            user->sendResponse(User::InvalidRequest, false, response);
+        else
+            user->sendResponse(User::InvalidAction, false, response);
+
+        return true;
+    }
+
+    return false;
 }
 
 User *CentiniServer::lookupUser(QString ipAddress)
@@ -347,7 +364,7 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 				user->setPeer(peer);
 				user->setPhoneState(phoneStateOf(channelStates.value(channel)));
 
-				QStringList queues = lookupQueue(peer);
+                QStringList queues = lookupQueue(peer);
 
 				if (!queues.isEmpty()) {
 					user->setQueues(queues);
@@ -508,6 +525,16 @@ void CentiniServer::actionPause(User *user, bool paused, QString reason)
         user->startPause();
     else
         user->finishPause();
+}
+
+void CentiniServer::requestStatus(User *user)
+{
+    QVariantMap fields;
+    fields["username"] = user->username();
+    fields["fullname"] = user->fullname();
+    fields["level"] = user->levelText(user->level());
+
+    user->sendResponse(User::Status, true, fields);
 }
 
 QVariantMap CentiniServer::populateUserInfo(User *user)
@@ -774,6 +801,7 @@ void CentiniServer::onTcpServerNewConnection()
 	DesktopUser *user = new DesktopUser;
 
 	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
+    connect(user, SIGNAL(requestReceived(User::Request,QVariantMap)), SLOT(onUserRequestReceived(User::Request,QVariantMap)));
 	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
 
 	user->setSocket(tcpServer->nextPendingConnection());
@@ -791,6 +819,7 @@ void CentiniServer::onWebSocketServerNewConnection()
 	WebUser *user = new WebUser;
 
 	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
+    connect(user, SIGNAL(requestReceived(User::Request,QVariantMap)), SLOT(onUserRequestReceived(User::Request,QVariantMap)));
 	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
 
 	user->setSocket(webSocketServer->nextPendingConnection());
@@ -805,14 +834,8 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 	User *user = (User *) sender();
 
 	if (action != User::Login) {
-		if (user->username().isEmpty()) {
-			QVariantMap response;
-			response["message"] = "Unauthorized access.";
-
-			user->sendResponse(User::Invalid, false, response);
-
-			return;
-		}
+        if (invalidResponse(user))
+            return;
 	}
 
 	switch (action) {
@@ -856,14 +879,22 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 		actionPause(user, fields["paused"].toBool(), fields["reason"].toString());
 
         break;
-	default:
-		QVariantMap response;
-		response["message"] = "Invalid action command.";
+    }
+}
 
-		user->sendResponse(action, false, response);
+void CentiniServer::onUserRequestReceived(User::Request request, QVariantMap fields)
+{
+    User *user = (User *) sender();
 
-		break;
-	}
+    if (invalidResponse(user, true))
+        return;
+
+    switch (request) {
+    case User::Status:
+        requestStatus(user);
+
+        break;
+    }
 }
 
 void CentiniServer::onUserDisconnected()

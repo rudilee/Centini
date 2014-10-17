@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT          +=  core network sql websockets
+QT          +=  core network sql websockets concurrent
 
 QT          -=  gui
 
@@ -16,15 +16,17 @@ TEMPLATE    =   app
 
 SOURCES     +=  main.cpp \
                 asteriskmanager.cpp \
-				centiniserver.cpp \
-				desktopuser.cpp \
-				user.cpp \
-    webuser.cpp \
-    callbackquery.cpp
+                centiniserver.cpp \
+                desktopuser.cpp \
+                user.cpp \
+                webuser.cpp \
+                callbackquery.cpp \
+                futurequery.cpp
 
 HEADERS     +=  asteriskmanager.h \
-				centiniserver.h \
-				desktopuser.h \
-				user.h \
-    webuser.h \
-    callbackquery.h
+                centiniserver.h \
+                desktopuser.h \
+                user.h \
+                webuser.h \
+                callbackquery.h \
+                futurequery.h
