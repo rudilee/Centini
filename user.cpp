@@ -287,7 +287,7 @@ void User::finishSession()
 void User::populateGroups()
 {
 	QSqlQuery query;
-	query.prepare("SELECT `group` FROM user_group WHERE username = :username");
+    query.prepare("SELECT `group` FROM group_member WHERE username = :username");
 	query.bindValue(":username", username_);
 
 	if (query.exec()) {

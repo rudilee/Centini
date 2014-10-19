@@ -23,7 +23,8 @@ public:
 	enum Level {
 		Agent,
 		Supervisor,
-		Manager
+        Manager,
+        Administrator
 	};
 
 	enum QueueState {
@@ -54,7 +55,8 @@ public:
 
     enum Request {
         InvalidRequest = -1,
-        Status
+        Status,
+        ChangePassword
     };
 
 	enum Event {

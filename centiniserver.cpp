@@ -335,16 +335,16 @@ bool CentiniServer::groupPermited(User *sender, User *receiver)
 	return /*1*/(sender != receiver) && (/*2*/!receiver->groups().toSet().intersect(sender->groups().toSet()).isEmpty() || /*3*/receiver->level() == User::Manager);
 }
 
-void CentiniServer::actionLogin(User *user, QString username, QString passwordHash)
+void CentiniServer::actionLogin(User *user, QString username, QString password)
 {
-	QString message = "Login failed, Username or IP Address already used.";
+    QString message = "Login failed, Username or IP Address already used.";
 	bool success = !users.values().contains(username) && !users.contains(user->ipAddress());
 
 	if (success) {
 		QSqlQuery query;
 		query.prepare("SELECT * FROM users WHERE username = :username AND password = :password");
 		query.bindValue(":username", username);
-		query.bindValue(":password", passwordHash);
+        query.bindValue(":password", QCryptographicHash::hash(password.toLatin1(), QCryptographicHash::Md5).toHex());
 
 		success = query.exec();
 
@@ -352,7 +352,7 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 			success = query.next();
 
 			if (success) {
-				message = "Successfuly logged in.";
+                message = "Successfuly logged in.";
 
 				QString peer = sipPeers.value(user->ipAddress()),
 						channel = channels.key(peer);
@@ -403,9 +403,11 @@ void CentiniServer::actionLogin(User *user, QString username, QString passwordHa
 
 					break;
 				}
-			}
+            } else {
+                message = "Username or password is invalid.";
+            }
 		} else {
-			message = "Login failed due to system error.";
+            message = "Login failed due to system error.";
 
 			qCritical() << "Login query failed, error:" << query.lastError().text();
 		}
@@ -425,7 +427,7 @@ void CentiniServer::actionLogout(User *user)
 	broadcastUserEvent(user, User::LoggedOut, fields);
 
 	QVariantMap response;
-	response["message"] = "Bye!";
+    response["message"] = "Bye!";
 
 	user->sendResponse(User::Logout, true, response);
 	user->disconnect();
@@ -535,6 +537,54 @@ void CentiniServer::requestStatus(User *user)
     fields["level"] = user->levelText(user->level());
 
     user->sendResponse(User::Status, true, fields);
+}
+
+void CentiniServer::requestChangePassword(User *user, QString username, QString newPassword, QString currentPassword)
+{
+    QVariantMap fields;
+
+    bool success = true,
+         permited = true;
+
+    QString message = "Password has been changed.";
+
+    QSqlQuery query;
+
+    if (user->username() == username) {
+        query.prepare("SELECT password FROM users WHERE username = :username AND password = :password");
+        query.bindValue(":username", username);
+        query.bindValue(":password", QCryptographicHash::hash(currentPassword.toLatin1(), QCryptographicHash::Md5).toHex());
+
+        if (query.exec()) {
+            success = query.next();
+
+            if (!success)
+                message = "Current password is incorrect.";
+        } else {
+            qDebug() << "Retrieve current password failed, error:" << query.lastError().text();
+        }
+    }
+
+    if (user->username() != username)
+        permited =  user->level() == User::Administrator;
+
+    if (success && permited) {
+        query.prepare("UPDATE users SET password = :password WHERE username = :username");
+        query.bindValue(":username", username);
+        query.bindValue(":password", QCryptographicHash::hash(newPassword.toLatin1(), QCryptographicHash::Md5).toHex());
+
+        success = query.exec();
+
+        if (!success) {
+            message = "Failed to change password.";
+
+            qDebug() << "Update password failed, error:" << query.lastError().text();
+        }
+    }
+
+    fields["message"] = message;
+
+    user->sendResponse(User::ChangePassword, success, fields);
 }
 
 QVariantMap CentiniServer::populateUserInfo(User *user)
@@ -892,6 +942,13 @@ void CentiniServer::onUserRequestReceived(User::Request request, QVariantMap fie
     switch (request) {
     case User::Status:
         requestStatus(user);
+
+        break;
+    case User::ChangePassword:
+        requestChangePassword(user,
+                              fields.contains("username") ? fields["username"].toString() : user->username(),
+                              fields["password"].toString(),
+                              fields["new_password"].toString());
 
         break;
     }

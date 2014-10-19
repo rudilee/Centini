@@ -73,7 +73,7 @@ private:
 	QString lookupCounterpart(QString channel);
 	bool groupPermited(User *sender, User *receiver);
 
-	void actionLogin(User *user, QString username, QString passwordHash);
+    void actionLogin(User *user, QString username, QString password);
 	void actionLogout(User *user);
 	void actionDial(User *user, QString number);
 	void actionHangup(User *user, QString target);
@@ -85,6 +85,7 @@ private:
     void actionPause(User *user, bool paused, QString reason);
 
     void requestStatus(User *user);
+    void requestChangePassword(User *user, QString username, QString newPassword, QString currentPassword = QString());
 
 	QVariantMap populateUserInfo(User *user);
 
