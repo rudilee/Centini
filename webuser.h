@@ -21,7 +21,6 @@ public:
 private:
 	QWebSocket *socket_;
 
-	void parseMessage(QString message);
 	void sendMessage(QVariantMap fields);
 
 public slots:

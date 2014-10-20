@@ -246,6 +246,21 @@ void User::timerEvent(QTimerEvent *event)
 	disconnect();
 }
 
+bool User::parseMessageFields(QVariantMap fields)
+{
+	QString actionText = fields.take("action").toString(),
+			requestText = fields.take("request").toString();
+
+	if (!actionText.isEmpty())
+		emit actionReceived((User::Action) actionIndex(actionText), fields);
+	else if (!requestText.isEmpty())
+		emit requestReceived((User::Request) requestIndex(requestText), fields);
+	else
+		return false;
+
+	return true;
+}
+
 QString User::enumText(QString enumName, int index)
 {
 	const QMetaObject *object = metaObject();

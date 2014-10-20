@@ -122,6 +122,8 @@ protected:
 
 	void timerEvent(QTimerEvent *event);
 
+	bool parseMessageFields(QVariantMap fields);
+
 private:
 	uint sessionId, pauseId;
 	QString username_, fullname_, peer_, pauseReason_;

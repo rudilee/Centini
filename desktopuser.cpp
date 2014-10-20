@@ -33,19 +33,6 @@ void DesktopUser::disconnect()
 	socket_->disconnectFromHost();
 }
 
-void DesktopUser::parseMessageBuffer()
-{
-	QVariantMap fields = QJsonDocument::fromJson(messageBuffer).object().toVariantMap();
-	QString actionText = fields.take("action").toString();
-
-	if (!actionText.isEmpty())
-		emit actionReceived((User::Action) actionIndex(actionText), fields);
-	else
-		socket_->write("Unrecognized command..\n");
-
-	messageBuffer.clear();
-}
-
 void DesktopUser::sendMessage(QVariantMap fields)
 {
 	if (socket_->state() != QTcpSocket::ConnectedState)
@@ -68,9 +55,13 @@ void DesktopUser::onSocketReadyRead()
 	while (socket_->canReadLine()) {
 		QByteArray line = socket_->readLine();
 
-		if (line != "\r\n")
+		if (line != "\r\n") {
 			messageBuffer += line;
-		else
-			parseMessageBuffer();
+		} else {
+			if (!parseMessageFields(QJsonDocument::fromJson(messageBuffer).object().toVariantMap()))
+				socket_->write("Unrecognized command..\n");
+
+			messageBuffer.clear();
+		}
 	}
 }

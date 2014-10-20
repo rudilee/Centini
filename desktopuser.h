@@ -24,7 +24,6 @@ private:
 	QTcpSocket *socket_;
 	QByteArray messageBuffer;
 
-	void parseMessageBuffer();
 	void sendMessage(QVariantMap fields);
 
 private slots:

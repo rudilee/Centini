@@ -396,10 +396,14 @@ void CentiniServer::actionLogin(User *user, QString username, QString password)
 
 					break;
 				default:
+				{
+					QVariantMap userInfo = populateUserInfo(user);
+
 					agents[username] = user;
 
-					broadcastUserEvent(user, &managers, User::LoggedIn, populateUserInfo(user));
-					broadcastUserEvent(user, &supervisors, User::LoggedIn, populateUserInfo(user));
+					broadcastUserEvent(user, &managers, User::LoggedIn, userInfo);
+					broadcastUserEvent(user, &supervisors, User::LoggedIn, userInfo);
+				}
 
 					break;
 				}
@@ -531,26 +535,21 @@ void CentiniServer::actionPause(User *user, bool paused, QString reason)
 
 void CentiniServer::requestStatus(User *user)
 {
-    QVariantMap fields;
-    fields["username"] = user->username();
-    fields["fullname"] = user->fullname();
-    fields["level"] = user->levelText(user->level());
-
-    user->sendResponse(User::Status, true, fields);
+	user->sendResponse(User::Status, true, populateUserInfo(user));
 }
 
 void CentiniServer::requestChangePassword(User *user, QString username, QString newPassword, QString currentPassword)
 {
     QVariantMap fields;
 
-    bool success = true,
+	bool success = !newPassword.isEmpty(),
          permited = true;
 
-    QString message = "Password has been changed.";
+	QString message = success ? "Password has been changed." : "New password can not be empty.";
 
     QSqlQuery query;
 
-    if (user->username() == username) {
+	if (success && user->username() == username) {
         query.prepare("SELECT password FROM users WHERE username = :username AND password = :password");
         query.bindValue(":username", username);
         query.bindValue(":password", QCryptographicHash::hash(currentPassword.toLatin1(), QCryptographicHash::Md5).toHex());
@@ -563,10 +562,10 @@ void CentiniServer::requestChangePassword(User *user, QString username, QString 
         } else {
             qDebug() << "Retrieve current password failed, error:" << query.lastError().text();
         }
-    }
+	}
 
-    if (user->username() != username)
-        permited =  user->level() == User::Administrator;
+	if (user->username() != username)
+		permited =  user->level() == User::Administrator;
 
     if (success && permited) {
         query.prepare("UPDATE users SET password = :password WHERE username = :username");
@@ -581,6 +580,11 @@ void CentiniServer::requestChangePassword(User *user, QString username, QString 
             qDebug() << "Update password failed, error:" << query.lastError().text();
         }
     }
+
+	qDebug() << "Username:" << username
+			 << "Password:" << currentPassword
+			 << "New Password:" << newPassword
+			 << "Hashed:" << QCryptographicHash::hash(newPassword.toLatin1(), QCryptographicHash::Md5).toHex();
 
     fields["message"] = message;
 
@@ -944,11 +948,11 @@ void CentiniServer::onUserRequestReceived(User::Request request, QVariantMap fie
         requestStatus(user);
 
         break;
-    case User::ChangePassword:
+	case User::ChangePassword:
         requestChangePassword(user,
                               fields.contains("username") ? fields["username"].toString() : user->username(),
-                              fields["password"].toString(),
-                              fields["new_password"].toString());
+							  fields["new_password"].toString(),
+							  fields["password"].toString());
 
         break;
     }

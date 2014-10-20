@@ -32,17 +32,6 @@ void WebUser::disconnect()
 	socket_->close();
 }
 
-void WebUser::parseMessage(QString message)
-{
-	QVariantMap fields = QJsonDocument::fromJson(message.toLatin1()).object().toVariantMap();
-	QString actionText = fields.take("action").toString();
-
-	if (!actionText.isEmpty())
-		emit actionReceived((User::Action) actionIndex(actionText), fields);
-	else
-		socket_->sendTextMessage("Unrecognized command..");
-}
-
 void WebUser::sendMessage(QVariantMap fields)
 {
 	if (socket_->state() != QAbstractSocket::ConnectedState)
@@ -61,6 +50,8 @@ void WebUser::onSocketError(QAbstractSocket::SocketError socketError)
 
 void WebUser::onSocketTextMessageReceived(QString message)
 {
-	if (!message.isEmpty())
-		parseMessage(message);
+	if (!message.isEmpty()) {
+		if (!parseMessageFields(QJsonDocument::fromJson(message.toLatin1()).object().toVariantMap()))
+			socket_->sendTextMessage("Unrecognized command..");
+	}
 }
