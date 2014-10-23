@@ -201,7 +201,7 @@ public:
 	QString actionParkinglots();
 	QString actionPauseMonitor();
 	QString actionPing();
-	QString actionPlayDTMF(QString channel, QChar digit);
+	QString actionPlayDTMF(QString channel, QString digit);
 	QString actionPresenceState();
 	QString actionPRIShowSpans();
 	QString actionQueueAdd(QString queue,

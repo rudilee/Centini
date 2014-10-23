@@ -62,31 +62,31 @@ void CentiniServer::addSipPeer(QVariantMap headers)
 
 	bool registered = headers.contains("PeerStatus") ? headers["PeerStatus"].toString() == "Registered" : true;
 
-	if (headers.contains("IPaddress")) {
-		ipAddress = headers["IPaddress"].toString();
-	} else {
-		if (addressPattern.indexIn(headers["Address"].toString()) > -1)
-			ipAddress = addressPattern.cap(1);
-		else
-			ipAddress = sipPeers.key(peer);
-	}
-
 	if (headers.contains("Peer"))
-		peer = peer = headers["Peer"].toString();
+		peer = headers["Peer"].toString();
 	else
 		peer = QString("%1/%2").arg(headers["Channeltype"].toString(), headers["ObjectName"].toString());
+
+	if (headers.contains("IPaddress"))
+		ipAddress = headers["IPaddress"].toString().remove("-none-");
+	else if (addressPattern.indexIn(headers["Address"].toString()) > -1)
+		ipAddress = addressPattern.cap(1);
+	else
+		ipAddress = sipPeers.key(peer);
 
 	if (!ipAddress.isEmpty() && !peer.isEmpty()) {
 		User *user = lookupUser(ipAddress);
 
 		if (user != NULL)
 			user->setPeer(registered ? peer : QString());
+
+		if (registered)
+			sipPeers[ipAddress] = peer;
+		else
+			sipPeers.remove(ipAddress);
 	}
 
-	if (registered)
-		sipPeers[ipAddress] = peer;
-	else
-		sipPeers.remove(ipAddress);
+	qDebug() << "IP Address:" << ipAddress << "Peer:" << peer;
 
 	if (!peer.isEmpty())
 		addAction(peer, asterisk->actionSIPshowpeer(QString(peer).remove("SIP/")));
@@ -484,7 +484,7 @@ void CentiniServer::actionTransfer(User *user, QString destination)
 		addAction(user->username(), asterisk->actionRedirect(channel, destination, context, 1), User::Transfer);
 }
 
-void CentiniServer::actionSendDigit(User *user, QChar digit)
+void CentiniServer::actionSendDigit(User *user, QString digit)
 {
 	QString channel = lookupCounterpart(channels.key(user->peer()));
 
@@ -914,7 +914,7 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 
 		break;
 	case User::SendDigit:
-		actionSendDigit(user, fields["digit"].toChar());
+		actionSendDigit(user, fields["digit"].toString());
 
 		break;
 	case User::Listen:

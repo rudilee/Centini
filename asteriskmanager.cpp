@@ -436,7 +436,7 @@ QString AsteriskManager::actionPing()
 	return sendAction("Ping");
 }
 
-QString AsteriskManager::actionPlayDTMF(QString channel, QChar digit)
+QString AsteriskManager::actionPlayDTMF(QString channel, QString digit)
 {
 	QVariantMap headers;
 	headers["Channel"] = channel;

@@ -78,7 +78,7 @@ private:
 	void actionDial(User *user, QString number);
 	void actionHangup(User *user, QString target);
 	void actionTransfer(User *user, QString destination);
-	void actionSendDigit(User *user, QChar digit);
+	void actionSendDigit(User *user, QString digit);
 	void actionListen(User *user, QString target, QChar option = QChar(), QString callerId = "Listen");
     void actionWhisper(User *user, QString target);
 	void actionBarge(User *user, QString target);
