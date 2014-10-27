@@ -196,7 +196,7 @@ public:
 							boolean earlyMedia = -1,
 							boolean async = -1,
 							QStringList codecs = QStringList());
-	QString actionPark();
+	QString actionPark(QString channel, QString channel2, uint timeout = 0, QString parkinglot = QString());
 	QString actionParkedCalls();
 	QString actionParkinglots();
 	QString actionPauseMonitor();

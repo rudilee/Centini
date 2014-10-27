@@ -151,6 +151,8 @@ User::PhoneState User::phoneState()
 void User::setLastCall(QDateTime lastCall)
 {
 	lastCall_ = lastCall;
+
+	qDebug() << "Username:" << username_ << "Last Call:" << lastCall;
 }
 
 QDateTime User::lastCall()

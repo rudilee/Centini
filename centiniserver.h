@@ -77,6 +77,7 @@ private:
 	void actionLogout(User *user);
 	void actionDial(User *user, QString number);
 	void actionHangup(User *user, QString target);
+	void actionHold(User *user, bool onHold);
 	void actionTransfer(User *user, QString destination);
 	void actionSendDigit(User *user, QString digit);
 	void actionListen(User *user, QString target, QChar option = QChar(), QString callerId = "Listen");

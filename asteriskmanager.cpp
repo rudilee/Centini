@@ -411,9 +411,16 @@ QString AsteriskManager::actionOriginate(QString channel,
 	return sendAction("Originate", headers);
 }
 
-QString AsteriskManager::actionPark()
+QString AsteriskManager::actionPark(QString channel, QString channel2, uint timeout, QString parkinglot)
 {
-	return sendAction("Park");
+	QVariantMap headers;
+	headers["Channel"] = channel;
+	headers["Channel2"] = channel2;
+
+	insertNotEmpty(&headers, "Timeout", timeout);
+	insertNotEmpty(&headers, "Parkinglot", parkinglot);
+
+	return sendAction("Park", headers);
 }
 
 QString AsteriskManager::actionParkedCalls()

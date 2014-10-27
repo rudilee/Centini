@@ -45,6 +45,7 @@ public:
 		Logout,
 		Dial,
 		Hangup,
+		Hold,
 		Transfer,
 		SendDigit,
 		Listen,

@@ -99,16 +99,35 @@ void CentiniServer::addChannel(QVariantMap headers)
 
 	int channelState = headers["ChannelState"].toInt();
 
-	channels[channel] = peer;
-	channelStates[channel] = channelState;
-
+	QDateTime lastCall = QDateTime();
 	User::PhoneState phoneState = phoneStateOf(channelState);
 	User *user = lookupUser(sipPeers.key(peer));
 
+	if (channelState == 6 || channelState == 7) {
+		QString duration = headers["Duration"].toString();
+
+		if (duration.isEmpty())
+			lastCall = QDateTime::currentDateTime();
+		else
+			lastCall = durationLastCall(duration);
+	}
+
 	if (user != NULL) {
+		if (!lastCall.isNull())
+			user->setLastCall(lastCall);
+
 		if (user->phoneState() != phoneState)
 			user->setPhoneState(phoneState);
 	}
+
+	channels[channel] = peer;
+	channelStates[channel] = channelState;
+	channelLastCalls[channel] = lastCall;
+
+	qDebug() << "Event:" << headers["Event"].toString()
+			 << "Channel:" << headers["Channel"].toString()
+			 << "Duration:" << headers["Duration"].toString()
+			 << "Last Call:" << lastCall.toString("dd/MM/yyyy hh:mm:ss");
 }
 
 void CentiniServer::removeChannel(QVariantMap headers)
@@ -468,6 +487,20 @@ void CentiniServer::actionHangup(User *user, QString target)
 				addAction(username, asterisk->actionHangup(channel), User::Hangup);
 			}
 		}
+	}
+}
+
+void CentiniServer::actionHold(User *user, bool onHold)
+{
+	QString channel2 = channels.key(sipPeers.value(user->ipAddress())),
+			channel = lookupCounterpart(channel2);
+
+	qDebug() << "Channel:" << channel
+			 << "Channel 2:" << channel2;
+
+	if (!channel2.isEmpty() && !channel.isEmpty()) {
+		asterisk->actionPark(channel, channel);
+		asterisk->actionPark(channel2, channel2);
 	}
 }
 
@@ -907,6 +940,10 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 		break;
 	case User::Hangup:
 		actionHangup(user, fields.contains("username") ? fields["username"].toString() : user->username());
+
+		break;
+	case User::Hold:
+		actionHold(user, fields["on_hold"].toBool());
 
 		break;
 	case User::Transfer:
