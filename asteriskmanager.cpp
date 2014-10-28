@@ -399,6 +399,8 @@ QString AsteriskManager::actionOriginate(QString channel,
 	insertNotEmpty(&headers, "Async", async);
 	insertNotEmpty(&headers, "Codecs", codecs.join(','));
 
+	qDebug() << "Headers:" << headers;
+
 	if (!variables.isEmpty()) {
 		QMapIterator<QString, QVariant> variable(variables);
 		while (variable.hasNext()) {
@@ -715,10 +717,9 @@ void AsteriskManager::insertNotEmpty(QVariantMap *headers, QString key, QVariant
 	bool isEmpty = false;
 
 	switch (value.type()) {
-	case QMetaType::Char:
+	case QMetaType::Int:
 		isEmpty = value.toChar() == -1;
 		break;
-	case QMetaType::Int:
 	case QMetaType::UInt:
 		isEmpty = value.toUInt() == 0;
 		break;

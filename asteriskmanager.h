@@ -7,7 +7,7 @@
 #define yes "yes"
 #define no "no"
 
-typedef qint8 boolean;
+typedef int boolean;
 typedef QString answer;
 
 class AsteriskManager : public QTcpSocket

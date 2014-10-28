@@ -98,7 +98,7 @@ QStringList User::queues()
 	return queues_;
 }
 
-void User::setQueueState(QString queue, User::QueueState queueState)
+void User::setQueueState(QString queue, User::QueueState queueState, QString pauseReason)
 {
 	queueState_ = queueState;
 
@@ -106,6 +106,9 @@ void User::setQueueState(QString queue, User::QueueState queueState)
 	fields["username"] = username_;
 	fields["queue"] = queue;
 	fields["queue_state"] = queueStateText(queueState);
+
+	if (!pauseReason.isEmpty())
+		fields["pause_reason"] = pauseReason;
 
 	sendEvent(User::QueueStateChanged, fields);
 
@@ -185,6 +188,20 @@ void User::finishPause()
 
     if (!query.exec())
 		qCritical() << "Pause finish query error:" << query.lastError().text();
+}
+
+void User::retrievePause()
+{
+	QSqlQuery query;
+	query.prepare("SELECT id, reason FROM user_pause_log WHERE username = :username AND finish IS NULL ORDER BY start DESC LIMIT 1");
+	query.bindValue(":username", username_);
+
+	if (query.exec()) {
+		if (query.next()) {
+			pauseId = query.value("id").toUInt();
+			pauseReason_ = query.value("reason").toString();
+		}
+	}
 }
 
 void User::sendResponse(User::Action action, bool success, QVariantMap fields)

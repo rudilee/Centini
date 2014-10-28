@@ -88,7 +88,7 @@ public:
 	void setQueues(QStringList queues);
     QStringList queues();
 
-	void setQueueState(QString queue, QueueState queueState);
+	void setQueueState(QString queue, QueueState queueState, QString pauseReason = QString());
 	QueueState queueState() const;
 
 	void setPauseReason(QString pauseReason);
@@ -104,6 +104,7 @@ public:
 
 	void startPause();
     void finishPause();
+	void retrievePause();
 
 	void sendResponse(User::Action action, bool success, QVariantMap fields = QVariantMap());
     void sendResponse(User::Request request, bool success, QVariantMap fields = QVariantMap());

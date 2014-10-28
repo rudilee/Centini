@@ -212,7 +212,7 @@ void CentiniServer::pauseQueueMember(QVariantMap headers)
 		User *user = lookupUser(sipPeers.key(location));
 
 		if (user != NULL)
-			user->setQueueState(queue, queueState);
+			user->setQueueState(queue, queueState, headers["Reason"].toString());
 	}
 }
 
@@ -386,11 +386,21 @@ void CentiniServer::actionLogin(User *user, QString username, QString password)
                 QStringList queues = lookupQueue(peer);
 
 				if (!queues.isEmpty()) {
+					bool isPaused = false;
+
 					user->setQueues(queues);
 
 					foreach (QString queue, queues) {
-						user->setQueueState(queue, queueMemberStates[queue].value(peer));
+						User::QueueState queueState = queueMemberStates[queue].value(peer);
+
+						user->setQueueState(queue, queueState);
+
+						if (queueState == User::Paused)
+							isPaused = true;
 					}
+
+					if (isPaused)
+						user->retrievePause();
 				}
 
 				connect(user, SIGNAL(peerChanged(QString)), SLOT(onUserPeerChanged(QString)));
@@ -458,9 +468,17 @@ void CentiniServer::actionLogout(User *user)
 
 void CentiniServer::actionDial(User *user, QString number)
 {
-	QString peer = user->peer();
+	QString peer = user->peer(),
+			extension = QString(peer).remove("SIP/");
 
-	addAction(user->username(), asterisk->actionOriginate(peer, number, peerContexts.value(peer), 1, QString(), QString(), 0, number), User::Dial);
+	QRegExp numberOnly("^[0-9]+$");
+
+	if (numberOnly.indexIn(number) > -1) {
+		QVariantMap variables;
+		variables["CDR(username)"] = user->username();
+
+		addAction(user->username(), asterisk->actionOriginate(peer, number, peerContexts.value(peer), 1, QString(), QString(), 0, extension, variables), User::Dial);
+	}
 }
 
 void CentiniServer::actionHangup(User *user, QString target)
@@ -558,6 +576,7 @@ void CentiniServer::actionPause(User *user, bool paused, QString reason)
         asterisk->actionQueuePause(peer, paused, queue, reason);
     }
 
+	// TODO: sanitasi input 'reason' dari Client
 	user->setPauseReason(reason);
 
     if (paused)
@@ -639,6 +658,11 @@ QVariantMap CentiniServer::populateUserInfo(User *user)
 
 	if (!lastCall.isNull())
 		fields["duration"] = lastCall.secsTo(QDateTime::currentDateTime());
+
+	QString pauseReason = user->pauseReason();
+
+	if (!pauseReason.isEmpty())
+		fields["pause_reason"] = pauseReason;
 
 	return fields;
 }
