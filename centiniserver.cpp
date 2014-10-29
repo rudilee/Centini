@@ -572,11 +572,21 @@ void CentiniServer::actionPause(User *user, bool paused, QString reason)
 {
     QString peer = user->peer();
 
+	QStringList reasons;
+	reasons << "ISTIRAHAT"
+			<< "TOILET"
+			<< "LUNCH"
+			<< "TIDUR"
+			<< "NGOBROL";
+
     foreach (QString queue, user->queues()) {
         asterisk->actionQueuePause(peer, paused, queue, reason);
     }
 
-	// TODO: sanitasi input 'reason' dari Client
+	// TODO: sanitasi input 'reason' dg metode yg rapihan
+	if (!reasons.contains(reason.toUpper()))
+		reason = "NO_REASON";
+
 	user->setPauseReason(reason);
 
     if (paused)
