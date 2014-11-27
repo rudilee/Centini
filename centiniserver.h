@@ -96,15 +96,14 @@ private:
 
 private slots:
 	void openDatabaseConnection();
-	void connectToAsterisk();
+    void connectToAsterisk();
 
 	void onAsteriskConnected(QString version);
 	void onAsteriskDisconnected();
 	void onAsteriskResponseSent(AsteriskManager::Response response, QVariantMap headers, QString actionID);
 	void onAsteriskEventGenerated(AsteriskManager::Event event, QVariantMap headers);
 
-	void onTcpServerNewConnection();
-	void onWebSocketServerNewConnection();
+    void onNewConnection();
 
 	void onUserActionReceived(User::Action action, QVariantMap fields);
     void onUserRequestReceived(User::Request request, QVariantMap fields);

@@ -237,7 +237,17 @@ QString AsteriskManager::actionHangup(QString channel, uint cause)
 
 	insertNotEmpty(&headers, "Cause", cause);
 
-	return sendAction("Hangup", headers);
+    return sendAction("Hangup", headers);
+}
+
+QString AsteriskManager::actionHold(QString channel, boolean hold)
+{
+    QVariantMap headers;
+    headers["Channel"] = channel;
+
+    insertNotEmpty(&headers, "Hold", hold);
+
+    return sendAction("Hold", headers);
 }
 
 QString AsteriskManager::actionIAXnetstats()

@@ -23,8 +23,8 @@ CentiniServer::CentiniServer(QObject *parent) :
 	connect(asterisk, SIGNAL(eventGenerated(AsteriskManager::Event,QVariantMap)),
 			SLOT(onAsteriskEventGenerated(AsteriskManager::Event,QVariantMap)));
 
-	connect(tcpServer, SIGNAL(newConnection()), SLOT(onTcpServerNewConnection()));
-	connect(webSocketServer, SIGNAL(newConnection()), SLOT(onWebSocketServerNewConnection()));
+    connect(tcpServer, SIGNAL(newConnection()), SLOT(onNewConnection()));
+    connect(webSocketServer, SIGNAL(newConnection()), SLOT(onNewConnection()));
 }
 
 void CentiniServer::run()
@@ -36,6 +36,34 @@ void CentiniServer::run()
     webSocketServer->listen(QHostAddress::Any, settings->value("centini/ws_port", 8080).toUInt());
 
     qDebug("Listening incoming connection");
+}
+
+void CentiniServer::onNewConnection()
+{
+    QVariantMap fields;
+    fields["version"] = "0.0.1";
+
+    bool isWebUser = QString(sender()->metaObject()->className()) != QString("QTcpServer");
+    User *user;
+
+    if (isWebUser)
+        user = new WebUser;
+    else
+        user = new DesktopUser;
+
+    connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
+    connect(user, SIGNAL(requestReceived(User::Request,QVariantMap)), SLOT(onUserRequestReceived(User::Request,QVariantMap)));
+    connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
+
+    if (!isWebUser)
+        ((DesktopUser *) user)->setSocket(tcpServer->nextPendingConnection());
+    else
+        ((WebUser *) user)->setSocket(webSocketServer->nextPendingConnection());
+
+    user->sendEvent(User::ActionReady, fields);
+
+    qDebug() << "New TCP Socket incoming connection from"
+             << user->ipAddress();
 }
 
 void CentiniServer::addAction(QString action, QString actionID, User::Action userAction)
@@ -510,16 +538,10 @@ void CentiniServer::actionHangup(User *user, QString target)
 
 void CentiniServer::actionHold(User *user, bool onHold)
 {
-	QString channel2 = channels.key(sipPeers.value(user->ipAddress())),
-			channel = lookupCounterpart(channel2);
+    QString channel = channels.key(sipPeers.value(user->ipAddress()));
 
-	qDebug() << "Channel:" << channel
-			 << "Channel 2:" << channel2;
-
-	if (!channel2.isEmpty() && !channel.isEmpty()) {
-		asterisk->actionPark(channel, channel);
-		asterisk->actionPark(channel2, channel2);
-	}
+    if (!channel.isEmpty())
+        asterisk->actionHold(channel, onHold);
 }
 
 void CentiniServer::actionTransfer(User *user, QString destination)
@@ -912,42 +934,6 @@ void CentiniServer::onAsteriskEventGenerated(AsteriskManager::Event event, QVari
 
 		break;
 	}
-}
-
-void CentiniServer::onTcpServerNewConnection()
-{
-	QVariantMap fields;
-	fields["version"] = "0.0.1";
-
-	DesktopUser *user = new DesktopUser;
-
-	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
-    connect(user, SIGNAL(requestReceived(User::Request,QVariantMap)), SLOT(onUserRequestReceived(User::Request,QVariantMap)));
-	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
-
-	user->setSocket(tcpServer->nextPendingConnection());
-	user->sendEvent(User::ActionReady, fields);
-
-	qDebug() << "New TCP Socket incoming connection from"
-			 << user->ipAddress();
-}
-
-void CentiniServer::onWebSocketServerNewConnection()
-{
-	QVariantMap fields;
-	fields["version"] = "0.0.1";
-
-	WebUser *user = new WebUser;
-
-	connect(user, SIGNAL(actionReceived(User::Action,QVariantMap)), SLOT(onUserActionReceived(User::Action,QVariantMap)));
-    connect(user, SIGNAL(requestReceived(User::Request,QVariantMap)), SLOT(onUserRequestReceived(User::Request,QVariantMap)));
-	connect(user, SIGNAL(disconnected()), SLOT(onUserDisconnected()));
-
-	user->setSocket(webSocketServer->nextPendingConnection());
-	user->sendEvent(User::ActionReady, fields);
-
-	qDebug() << "New WebSocket incoming connection from"
-			 << user->ipAddress();
 }
 
 void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields)

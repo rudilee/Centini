@@ -157,7 +157,9 @@ public:
 	QString actionGetConfig();
 	QString actionGetConfigJSON();
 	QString actionGetvar();
-	QString actionHangup(QString channel, uint cause = 0);
+    QString actionHangup(QString channel, uint cause = 0);
+    // Action Hold bukan action bawaan AMI, harus di patch dulu di manager.c
+    QString actionHold(QString channel, boolean hold = true);
 	QString actionIAXnetstats();
 	QString actionIAXpeerlist();
 	QString actionIAXpeers();
