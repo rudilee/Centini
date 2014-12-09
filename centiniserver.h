@@ -75,7 +75,7 @@ private:
 
     void actionLogin(User *user, QString username, QString password);
 	void actionLogout(User *user);
-	void actionDial(User *user, QString number);
+    void actionDial(User *user, QString number, QString customerId = QString(), QString campaign = QString());
 	void actionHangup(User *user, QString target);
 	void actionHold(User *user, bool onHold);
 	void actionTransfer(User *user, QString destination);

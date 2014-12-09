@@ -494,7 +494,7 @@ void CentiniServer::actionLogout(User *user)
 	user->disconnect();
 }
 
-void CentiniServer::actionDial(User *user, QString number)
+void CentiniServer::actionDial(User *user, QString number, QString customerId, QString campaign)
 {
 	QString peer = user->peer(),
 			extension = QString(peer).remove("SIP/");
@@ -504,6 +504,12 @@ void CentiniServer::actionDial(User *user, QString number)
 	if (numberOnly.indexIn(number) > -1) {
 		QVariantMap variables;
 		variables["CDR(username)"] = user->username();
+
+        if (!customerId.isEmpty())
+            variables["CDR(customer_id)"] = customerId;
+
+        if (!campaign.isEmpty())
+            variables["CDR(campaign)"] = campaign;
 
 		addAction(user->username(), asterisk->actionOriginate(peer, number, peerContexts.value(peer), 1, QString(), QString(), 0, extension, variables), User::Dial);
 	}
@@ -955,7 +961,7 @@ void CentiniServer::onUserActionReceived(User::Action action, QVariantMap fields
 
 		break;
 	case User::Dial:
-		actionDial(user, fields.contains("username") ? fields["username"].toString() : fields["number"].toString());
+        actionDial(user, fields.contains("username") ? fields["username"].toString() : fields["number"].toString(), fields["customer_id"].toString(), fields["campaign"].toString());
 
 		break;
 	case User::Hangup:
